@@ -1,0 +1,13 @@
+{% extends "bus/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<h1>Edit Booking</h1>
+
+<form method="post">
+  {% csrf_token %}
+  {{ form|crispy }}
+  <button type="submit" class="btn btn-primary">Update Booking</button>
+</form>
+<a href="{% url 'booking_summary'%}" class="btn btn-secondary">Back to Summary</a>
+{% endblock content %}

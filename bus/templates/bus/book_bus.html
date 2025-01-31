@@ -1,0 +1,19 @@
+{% extends "bus/base.html" %}
+{% block content %}
+{% load crispy_forms_tags %}
+
+<form method="POST">
+  {% csrf_token %}
+  <fieldset class="form-group">
+      <h1>Book Bus</h1>
+      <p>Bus: {{ bus.bus_number }}</p>
+      <p>Route: {{ bus.route }}</p>
+      <p>Available Seats: {{ bus.available_seats }}</p>
+      {{ form|crispy }}
+  </fieldset>
+  <div class="form-group">
+      <button class="btn btn-outline-info" type="submit">Confirm Booking</button>
+  </div>
+</form>
+
+{% endblock content %}

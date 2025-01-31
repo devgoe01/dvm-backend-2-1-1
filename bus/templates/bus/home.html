@@ -1,0 +1,31 @@
+{% extends "bus/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+<h1>Search Buses</h1>
+
+<form method="GET">
+  {{ form|crispy }}
+  <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+<hr>
+<h1>Search Results</h1>
+{% for bus in buses %}
+  <div>
+    <p>Bus: {{ bus.bus_number }}</p>
+    <p>Route: {{ bus.route.source }} to {{ bus.route.destination }}</p>
+    <p>Departure: {{ bus.departure_time }}</p>
+    <p>Available Seats: {{ bus.available_seats }}</p>
+    <a href="{% url 'book_bus' bus.bus_number %}">Book Now</a>
+    <hr>
+  </div>
+{% empty %}
+  <p>No buses found for this route.</p>
+{% endfor %}
+
+
+{% endblock content %}
+
+

@@ -1,0 +1,16 @@
+{% extends "bus/base.html" %}
+
+{% block content %}
+<h1>Buses you can edit: </h1>
+{% for bus in buses %}
+    <div>
+        <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
+        <p><strong>Route:</strong> {{ bus.route.source }} to {{ bus.route.destination }}</p>
+        <p><strong>Departure:</strong> {{ bus.departure_time }}</p>
+        <p><strong>Available Seats</strong>: {{ bus.available_seats }}</p>
+        <p><strong>Fare</strong>: {{ bus.fare }}</p>
+        <a href="{% url 'edit_bus' bus.bus_number %}">Edit</a>
+        <hr>
+    </div>
+{% endfor %}
+{% endblock content %}
