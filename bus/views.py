@@ -8,6 +8,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 from datetime import datetime
 from users import utils
+from django.utils import timezone
+from datetime import timedelta
 
 @login_required
 def dashboard(request):
@@ -47,7 +49,7 @@ def book_bus(request, bus_number):
             seats_booked=form.cleaned_data['seats_booked']
             if user.wallet_balance >= (seats_booked * bus.fare):
                 email_otp = utils.generate_otp()
-                request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp}
+                request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
             
                 send_mail(
                     'Email Verification OTP',
@@ -94,6 +96,10 @@ def verif_bus_otp(request):
             messages.success(request, "A new OTP has been sent to your email.")
             return redirect('verif_bus_otp')
         if utils.verify_otp(entered_otp,stored_otp):
+            otp_creation_time = timezone.datetime.fromisoformat(temp_booking['otp_created_time'])
+            if (timezone.now() - otp_creation_time) > timedelta(minutes=2):
+                messages.error(request, "OTP has expired. Please request a new one.")
+                return redirect('verif_bus_otp')
             user = request.user
             bus = get_object_or_404(Bus,bus_number=temp_booking['bus_number'])
             seats_booked = temp_booking['seats_booked']
@@ -114,8 +120,8 @@ def verif_bus_otp(request):
             del request.session['temp_booking']
             return redirect('booking_summary')
         else:
-            return render(request, 'users/verify_otp.html', {'error': 'Invalid OTP'})
-
+            messages.error(request, "Invalid OTP. Please try again.")
+            return render(request, 'users/verify_otp.html')
     return render(request, 'users/verify_otp.html')
 
 @login_required

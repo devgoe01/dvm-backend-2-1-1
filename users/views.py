@@ -9,6 +9,9 @@ from django.contrib.auth import login
 from .utils import generate_otp, verify_otp
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+
 
 @login_required
 def profile(request):
@@ -46,10 +49,8 @@ def register(request):
             username = form.cleaned_data['username']
             email = form.cleaned_data['email']
             password = form.cleaned_data['password1']
-            
             email_otp = generate_otp()
-            request.session['temp_user'] = {'username': username,'email': email,'password': password,'otp': email_otp
-            }
+            request.session['temp_user'] = {'username': username,'email': email,'password': password,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
             
             send_mail(
                 'Email Verification OTP',
@@ -78,6 +79,7 @@ def verif_otp(request):
         if entered_otp=="Resend" or entered_otp=="resend" or entered_otp=="ReSend" or entered_otp=="RESEND":
             new_otp = generate_otp()
             temp_user['otp'] = new_otp
+            temp_user['otp_creation_time'] = timezone.now().isoformat()
             request.session['temp_user'] = temp_user
             send_mail(
                 'New OTP for verification',
@@ -89,9 +91,11 @@ def verif_otp(request):
             messages.success(request, "A new OTP has been sent to your email.")
             return redirect('verif_otp')
         if verify_otp(entered_otp,stored_otp):
-            user = User.objects.create_user(username=temp_user['username'],email=temp_user['email'],password=temp_user['password']
-            )
-            user.is_email_verified = True
+            otp_creation_time = timezone.datetime.fromisoformat(temp_user['otp_created_time'])
+            if (timezone.now() - otp_creation_time) > timedelta(minutes=2):
+                messages.error(request, "OTP has expired. Please request a new one.")
+                return redirect('verif_otp')
+            user = User.objects.create_user(username=temp_user['username'],email=temp_user['email'],password=temp_user['password'])
             user.save()
             send_mail(
                 'Account Created Successfully',
@@ -106,6 +110,6 @@ def verif_otp(request):
             messages.success(request, "Your account has been created successfully!")
             return redirect('dashboard')
         else:
-            return render(request, 'users/verify_otp.html', {'error': 'Invalid OTP'})
-
+            messages.error(request, "Invalid OTP. Please try again.")
+            return render(request, 'users/verify_otp.html')
     return render(request, 'users/verify_otp.html')

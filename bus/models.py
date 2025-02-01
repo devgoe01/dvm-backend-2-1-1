@@ -3,12 +3,10 @@ from django.contrib.auth.models import AbstractUser,Group,Permission
 from django.conf import settings
 class User(AbstractUser):
     ROLE_CHOICES = (('passenger', 'Passenger'),('admin', 'Administrator'),)
-    is_email_verified = models.BooleanField(default=False)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='passenger')
     wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     can_change_buses = models.ManyToManyField('Bus',related_name='editable_by', blank=True)# defined later,
     email = models.EmailField(unique=True)
-    email_otp = models.CharField(max_length=6, null=True, blank=True)
     def is_passenger(self):
         return self.role == 'passenger'
 
