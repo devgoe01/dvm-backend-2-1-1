@@ -1,3 +1,5 @@
+# REQUEST.SESSION
+
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -32,18 +34,23 @@ def profile(request):
 
     return render(request, 'users/profile.html', context)
 
+
 def register(request):
-    form=UserRegisterForm()
+#    if request.user.is_authenticated:
+#        return redirect('dashboard')
+    form = UserRegisterForm()
+    
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
             username = form.cleaned_data['username']
             email = form.cleaned_data['email']
             password = form.cleaned_data['password1']
-            user =User.objects.create_user(username=username, email=email, password=password)
+            
             email_otp = generate_otp()
-            user.email_otp = email_otp
-            user.save()
+            request.session['temp_user'] = {'username': username,'email': email,'password': password,'otp': email_otp
+            }
+            
             send_mail(
                 'Email Verification OTP',
                 f'Your OTP for email verification is: {email_otp}',
@@ -51,22 +58,52 @@ def register(request):
                 [email],
                 fail_silently=False,
             )
-            messages.success(request, f'Your account has been created.')
-            return redirect('verify_otp', user_id=user.id)
-        
+            messages.success (request, "An OTP has been sent to your email.")
+            return redirect('verif_otp')
 
-    return render(request, 'users/register.html',{'form': form})
+    return render(request, 'users/register.html', {'form': form})
 
+def verif_otp(request):
+    temp_user = request.session.get('temp_user')
 
-def verif_otp(request, user_id):
-    user = User.objects.get(id=user_id)
+# insures that if a person is visiting the page without going through the registration process, they are redirected to the register page
+    if not temp_user:
+        messages.error(request, "Please register again.")
+        return redirect('register')
+
     if request.method == 'POST':
-        email_otp = request.POST['email_otp']
-        if verify_otp(email_otp, user.email_otp):
+        entered_otp = request.POST.get('email_otp')
+        stored_otp = temp_user['otp']
+
+        if entered_otp=="Resend" or entered_otp=="resend" or entered_otp=="ReSend" or entered_otp=="RESEND":
+            new_otp = generate_otp()
+            temp_user['otp'] = new_otp
+            request.session['temp_user'] = temp_user
+            send_mail(
+                'New OTP for verification',
+                f'Your new OTP is: {new_otp}',
+                settings.EMAIL_HOST_USER,
+                [temp_user['email']],
+                fail_silently=False,
+            )
+            messages.success(request, "A new OTP has been sent to your email.")
+            return redirect('verif_otp')
+        if verify_otp(entered_otp,stored_otp):
+            user = User.objects.create_user(username=temp_user['username'],email=temp_user['email'],password=temp_user['password']
+            )
             user.is_email_verified = True
-            user.email_otp = None
             user.save()
+            send_mail(
+                'Account Created Successfully',
+                f'Congratulations {user.username}, you have been signed up for our bus booking platform!',
+                settings.EMAIL_HOST_USER,
+                [user.email],
+                fail_silently=False,
+            )
+            del request.session['temp_user']
+            
             login(request, user)
+            messages.success(request, "Your account has been created successfully!")
             return redirect('dashboard')
         else:
             return render(request, 'users/verify_otp.html', {'error': 'Invalid OTP'})

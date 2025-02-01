@@ -11,4 +11,6 @@ urlpatterns = [
     path('edit-bus/<int:bus_number>/', views.edit_bus, name='edit_bus'),
     path('bus-list/', views.admin_bus_list, name='bus_list'),
     path('about/', views.about, name='about'),
+    path('verify_bus_otp/', views.verif_bus_otp, name='verif_bus_otp'),
+    path('verify_edit_booking_otp/', views.verif_bus_otp, name='edit_booking_otp'),
 ]

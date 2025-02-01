@@ -1,7 +1,11 @@
+{% extends "bus/base.html" %}
+{% block content %}
 
 <form method="post">
     {% csrf_token %}<div class="border pt-3 margin mb-4">
-    <input class="form-control" type="text" name="email_otp" placeholder="Email OTP" required></h1>
+    <input class="form-control" type="text" name="email_otp" placeholder="Email OTP"></h1>
     <button type="submit">Verify OTP</button>
     </div>
+    <p>If you want the OTP to be resent, enter resend in above field and click verify</a></p>
 </form>
+{% endblock content %}

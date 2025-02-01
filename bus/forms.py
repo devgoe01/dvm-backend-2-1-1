@@ -23,7 +23,6 @@ class SearchForm(forms.Form):
     sort_by_departure = forms.BooleanField(required=False,label="check to sort by departure time else by available seats")
 
 
-
 class EditBookingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.current_booking = kwargs.pop('current_booking', None)

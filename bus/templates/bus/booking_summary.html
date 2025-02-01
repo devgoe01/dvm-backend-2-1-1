@@ -3,12 +3,18 @@
 {% block content %}
 
 <h1>Booking Summary</h1>
+<hr>
+<h4 style="color: greenyellow;">You currently have {{ confirmed_bookings }} booking(s)</h4>
 {% for booking in bookings %}
     <div>
         <p><strong>Booking ID:</strong> {{ booking.id }}</p>
         <p><strong>User:</strong> {{ booking.user.username }}</p>
         <p><strong>Bus: </strong>{{ booking.bus.bus_number }}</p>
+        {% if booking.status == 'Confirmed' %}
         <p><strong>Seats Booked:</strong> {{ booking.seats_booked }}</p>
+        {% else %}
+        <p><strong>Seats Booked:</strong> {{ booking.seats_booked }} (Cancelled)</p>
+        {% endif %}
         <p><strong>Status:</strong> {{ booking.status }}</p>
         {% if booking.can_edit %}
             <a href="{% url 'edit_booking' booking.id %}" class="btn btn-warning">Edit/Cancel</a>
@@ -16,9 +22,10 @@
             <p class="text-danger">Editing not allowed (less than 6 hours left).</p>
         {% endif %}
     </div>
-    <hr
+    <hr>
 {% empty %}
     <p>No bookings found.</p>
 {% endfor %}
 <a href="{% url 'project-home' %}">Search More Buses</a>
+
 {% endblock content %}
