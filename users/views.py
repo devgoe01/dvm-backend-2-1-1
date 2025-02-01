@@ -1,21 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from .forms import UserRegisterForm, UserUpdateForm, ProfileUpdateForm
-
-
-def register(request):
-    if request.method == 'POST':
-        form = UserRegisterForm(request.POST)
-        if form.is_valid():
-            form.save()
-            username = form.cleaned_data.get('username')
-            messages.success(request, f'Your account has been created! You are now able to log in')
-            return redirect('login')
-    else:
-        form = UserRegisterForm()
-    return render(request, 'users/register.html', {'form': form})
-
+from .forms import UserUpdateForm, ProfileUpdateForm, UserRegisterForm
+from bus.models import User
+from django.contrib.auth import login
+from .utils import generate_otp, verify_otp
+from django.core.mail import send_mail
+from django.conf import settings
 
 @login_required
 def profile(request):
@@ -40,3 +31,44 @@ def profile(request):
     }
 
     return render(request, 'users/profile.html', context)
+
+def register(request):
+    form=UserRegisterForm()
+    if request.method == 'POST':
+        form = UserRegisterForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['username']
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password1']
+            user =User.objects.create_user(username=username, email=email, password=password)
+            email_otp = generate_otp()
+            user.email_otp = email_otp
+            user.save()
+            send_mail(
+                'Email Verification OTP',
+                f'Your OTP for email verification is: {email_otp}',
+                settings.EMAIL_HOST_USER,
+                [email],
+                fail_silently=False,
+            )
+            messages.success(request, f'Your account has been created.')
+            return redirect('verify_otp', user_id=user.id)
+        
+
+    return render(request, 'users/register.html',{'form': form})
+
+
+def verif_otp(request, user_id):
+    user = User.objects.get(id=user_id)
+    if request.method == 'POST':
+        email_otp = request.POST['email_otp']
+        if verify_otp(email_otp, user.email_otp):
+            user.is_email_verified = True
+            user.email_otp = None
+            user.save()
+            login(request, user)
+            return redirect('dashboard')
+        else:
+            return render(request, 'users/verify_otp.html', {'error': 'Invalid OTP'})
+
+    return render(request, 'users/verify_otp.html')
