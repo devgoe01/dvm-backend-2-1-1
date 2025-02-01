@@ -1,0 +1,1 @@
+!!! I copied adapters.py 
