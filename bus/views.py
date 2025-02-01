@@ -73,36 +73,36 @@ def book_bus(request, bus_number):
 
 def verif_bus_otp(request):
     temp_booking = request.session.get('temp_booking')
+    entered_otp = request.POST.get('email_otp')
+    stored_otp = temp_booking['otp']
+    email=temp_booking['email']
+    seats_booked=temp_booking['seats_booked']
+    otp_creation_time = timezone.datetime.fromisoformat(temp_booking['otp_creation_time'])
+    bus_number=temp_booking['bus_number']
 
     if not temp_booking:
         messages.error(request, "Please try again.")
         return redirect('project-home')
-
     if request.method == 'POST':
-        entered_otp = request.POST.get('email_otp')
-        stored_otp = temp_booking['otp']
-
         if entered_otp=="Resend" or entered_otp=="resend" or entered_otp=="ReSend" or entered_otp=="RESEND":
             new_otp = utils.generate_otp()
             temp_booking['otp'] = new_otp
-            request.session['temp_user'] = temp_booking
+            request.session['temp_booking'] = temp_booking
             send_mail(
                 'New OTP for verification',
                 f'Your new OTP is: {new_otp}',
                 settings.EMAIL_HOST_USER,
-                [temp_booking['email']],
+                [email],
                 fail_silently=False,
             )
             messages.success(request, "A new OTP has been sent to your email.")
             return redirect('verif_bus_otp')
         if utils.verify_otp(entered_otp,stored_otp):
-            otp_creation_time = timezone.datetime.fromisoformat(temp_booking['otp_created_time'])
             if (timezone.now() - otp_creation_time) > timedelta(minutes=2):
                 messages.error(request, "OTP has expired. Please request a new one.")
                 return redirect('verif_bus_otp')
             user = request.user
-            bus = get_object_or_404(Bus,bus_number=temp_booking['bus_number'])
-            seats_booked = temp_booking['seats_booked']
+            bus = get_object_or_404(Bus,bus_number=bus_number)
             booking = Booking.objects.create(user=request.user,bus=bus,seats_booked=seats_booked)
             booking.save()
             user.wallet_balance -= (seats_booked * bus.fare)
@@ -117,7 +117,8 @@ def verif_bus_otp(request):
             settings.EMAIL_HOST_USER,
             [user.email],
             fail_silently=False)
-            del request.session['temp_booking']
+            if (not temp_booking):
+                del request.session['temp_booking']
             return redirect('booking_summary')
         else:
             messages.error(request, "Invalid OTP. Please try again.")
@@ -158,8 +159,16 @@ def edit_booking(request, booking_id):
                 request.user.save()
                 booking.bus.available_seats += booking.seats_booked
                 booking.bus.save()
+                updated_booking.seats_booked=original_seats_booked
+                send_mail(
+                    f'Booking cancelled for bus {booking.bus.bus_number} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
+                    f'Booking  for bus {booking.bus.bus_number} has been cancelled.\n{additional_cost} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance} rupees.\n',
+                    settings.EMAIL_HOST_USER,
+                    [request.user.email],
+                    fail_silently=False)
+                updated_booking.save()
             difference=updated_booking.seats_booked - original_seats_booked
-            if difference!=0:
+            if difference!=0 and updated_booking.status=='Confirmed':
                 additional_cost=difference * booking.bus.fare
                 if request.user.wallet_balance >= additional_cost:
                     request.user.wallet_balance -= additional_cost
@@ -167,8 +176,8 @@ def edit_booking(request, booking_id):
                     booking.bus.available_seats -= difference
                     booking.bus.save()
                     send_mail(
-                    f'Updated booking status for bus {booking.bus.bus_number}',
-                    f'Booking status for bus {booking.bus.bus_number} has been updated.\n{updated_booking.seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination} \n{additional_cost} rupees has been debited from your wallet. Your current remaining balance is {request.user.wallet_balance} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+                    f'Updated booking status for bus {booking.bus.bus_number} on {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
+                    f'Booking status for bus {booking.bus.bus_number} has been updated.\n{updated_booking.seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination} \n{additional_cost if (additional_cost>0) else (-1*additional_cost)} rupees have been {"deducted" if difference<0 else "added"} from your wallet. Your current remaining balance is {request.user.wallet_balance} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
                     settings.EMAIL_HOST_USER,
                     [request.user.email],
                     fail_silently=False)
@@ -178,7 +187,7 @@ def edit_booking(request, booking_id):
                 else:
                     messages.error(request, "Insufficient wallet balance for additional seats.")
                     return redirect('edit_booking', booking_id=booking_id)
-            else:
+            elif difference==0:
                 messages.error(request, "No change in number of seats.")
                 return redirect('edit_booking', booking_id=booking_id)
     else:
