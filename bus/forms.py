@@ -1,20 +1,25 @@
 from django import forms
 from . import models
+from.utils import unpack_available_seats_classes
 class BookingForm(forms.ModelForm):
     seats_booked=forms.IntegerField(required=True,label="Number of seats: ")
+    seat_class=forms.CharField(required=True,label="Enter seat class general or luxury or sleeper: ")
     class Meta:
         model = models.Booking
         fields = ['seats_booked']
-    def clean_seats_booked(self):
-        seats_booked = self.cleaned_data['seats_booked']
+    def clean(self):
+        cleaned_data = super().clean()
+        seats_booked = cleaned_data.get('seats_booked')
         bus = self.instance.bus
-        
+        selected_class=cleaned_data.get('seat_class')
+        if not(selected_class =="General" or selected_class =="Sleeper" or selected_class =="Luxury" or selected_class=="general" or selected_class=="sleeper" or selected_class=="luxury"):
+            raise forms.ValidationError("Invalid seat class.")
         if seats_booked <= 0:
             raise forms.ValidationError("Number of seats must be greater than 0.")
-        if seats_booked > bus.available_seats :
+        available_seats=int(unpack_available_seats_classes(bus.bus_number)[selected_class])
+        if seats_booked > available_seats :
             raise forms.ValidationError(f"Only {bus.available_seats} seats are available.")
-        
-        return seats_booked
+        return cleaned_data
 
 
 class SearchForm(forms.Form):

@@ -12,9 +12,10 @@ from django.utils import timezone
 from datetime import timedelta
 import openpyxl
 from django.http import HttpResponse
-
+from .utils import unpack_available_seats_classes,unpack_booked_seats_class,pack_available_seats_classes,pack_booked_seats
+#from .utils import unpack_seat_classes,pack_seat_classes
 @login_required
-def dashboard(request):
+def dashboard(request):    
     if request.user.role == 'admin' or request.user.role=='Administrator':
         return render(request,'bus/admin_dashboard.html')
     else:
@@ -40,18 +41,24 @@ def home(request):
 @login_required
 def book_bus(request, bus_number):
     bus=get_object_or_404(Bus, bus_number=bus_number)
+    available_seats=unpack_available_seats_classes(bus_number)
     if request.method == "POST":
         form=BookingForm(request.POST)
         form.instance.bus=bus
         user=request.user
         if form.is_valid():
             booking=form.save(commit=False)
-            booking.user=request.user
+            booking.user=user
             booking.bus=bus
             seats_booked=form.cleaned_data['seats_booked']
+            selected_class=form.cleaned_data['seat_class']
+            if seats_booked>available_seats[selected_class]:
+                messages.error(request, "not enough available seats in this class.")
+                return redirect('book_bus', bus_number=bus_number)
             if user.wallet_balance >= (seats_booked * bus.fare):
                 email_otp = utils.generate_otp()
-                request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
+                request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp,'otp_creation_time': timezone.now().isoformat(),
+                'selected_class': selected_class}
             
                 send_mail(
                     'Email Verification OTP',
@@ -65,8 +72,8 @@ def book_bus(request, bus_number):
                 messages.error(request, "Insufficient wallet balance.")
                 return redirect('book_bus', bus_number=bus_number)
         else:
-            messages.error(request, "Not enough seats available.")
-                
+            messages.error(request, "Invalid form.")
+            form=BookingForm()               
     else:
         form=BookingForm()
 
@@ -78,10 +85,10 @@ def verif_bus_otp(request):
     entered_otp = request.POST.get('email_otp')
     stored_otp = temp_booking['otp']
     email=request.user.email
+    selected_class=temp_booking['selected_class']
     seats_booked=temp_booking['seats_booked']
     otp_creation_time = timezone.datetime.fromisoformat(temp_booking['otp_creation_time'])
     bus_number=temp_booking['bus_number']
-
     if not temp_booking:
         messages.error(request, "Please try again.")
         return redirect('project-home')
@@ -106,17 +113,21 @@ def verif_bus_otp(request):
                 return redirect('verif_bus_otp')
             user = request.user
             bus = get_object_or_404(Bus,bus_number=bus_number)
+            user.wallet_balance -= (seats_booked * bus.fare)
+            available_seats=unpack_available_seats_classes(bus_number)
+            available_seats[selected_class] -= seats_booked
+            bus.available_seats =pack_available_seats_classes(selected_class,available_seats[selected_class],bus_number)
+            seats_booked_for_mail=seats_booked
+            seats_booked=pack_booked_seats(selected_class,seats_booked)
             booking = Booking.objects.create(user=request.user,bus=bus,seats_booked=seats_booked)
             booking.save()
-            user.wallet_balance -= (seats_booked * bus.fare)
             user.save()
-            bus.available_seats -= seats_booked
             bus.save()
             booking.save()
             messages.success(request, "Your booking was successful!")
             send_mail(
             f'You booking for bus {bus.bus_number} has been confirmed!',
-            f'Congratulations {user.username}, you booked {seats_booked} seats for bus {bus.bus_number} from {bus.route.source} to {bus.route.destination} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}.\n{seats_booked*bus.fare} rupees has been debited from your wallet. Your current remaining balance is {user.wallet_balance} rupees.\nYour booking id is {booking.id}.\nDeparture time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+            f'Congratulations {user.username}, you booked {seats_booked_for_mail} seats for bus {bus.bus_number} from {bus.route.source} to {bus.route.destination} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}.\n{seats_booked_for_mail*bus.fare} rupees has been debited from your wallet. Your current remaining balance is {user.wallet_balance} rupees.\nYour booking id is {booking.id}.\nDeparture time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
             settings.EMAIL_HOST_USER,
             [user.email],
             fail_silently=False)

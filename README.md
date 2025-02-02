@@ -15,3 +15,7 @@ BUS DEPARTURED
 TIMEZONE
 
 WALLET BALANCE
+
+DIFFERENT FARE FOR CLASSES
+
+seat classes for editing booking

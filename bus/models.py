@@ -19,15 +19,16 @@ class Route(models.Model):
     duration = models.DurationField()
 
     def __str__(self):
-        return f"{self.source} to {self.destination}"
+        return f"{self.source} --> {self.destination}"
 
 class Bus(models.Model):
     route = models.ForeignKey(Route, on_delete=models.CASCADE)
     bus_number = models.PositiveIntegerField(unique=True)
     total_seats = models.PositiveIntegerField()
-    available_seats = models.PositiveIntegerField()
+    available_seats = models.CharField(default=2-2-2,max_length=11,help_text="Available Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
     departure_time = models.DateTimeField()
     fare = models.DecimalField(max_digits=6, decimal_places=2)
+    seat_classes = models.CharField(default=2-2-2,max_length=11,help_text="Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
 
     def __str__(self):
         return f"By {self.bus_number} from {self.route.source} to {self.route.destination}"
@@ -35,9 +36,20 @@ class Bus(models.Model):
 class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
-    seats_booked = models.PositiveIntegerField(default=0)
+    seats_booked = models.CharField(default=2-2-2,max_length=11,help_text="Booked Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
     booking_time = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=[('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')], default='Confirmed')
 
     def __str__(self):
         return f"Booking {self.id} by {self.user.username}"
+    
+
+class SeatClass(models.Model):
+    SEAT_CLASS_CHOICES = [('General', 'General'),('Sleeper', 'Sleeper'),('Luxury', 'Luxury')]
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
+    seat_class = models.CharField(max_length=20, choices=SEAT_CLASS_CHOICES)
+    total_seats = models.PositiveIntegerField()
+    available_seats = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.seat_class} ({self.available_seats}/{self.total_seats} seats)"
