@@ -50,7 +50,7 @@ def register(request):
             email = form.cleaned_data['email']
             password = form.cleaned_data['password1']
             email_otp = generate_otp()
-            request.session['temp_user'] = {'username': username,'password': password,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
+            request.session['temp_user'] = {'username': username,'email': email,'password': password,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
             
             send_mail(
                 'Email Verification OTP',
@@ -66,11 +66,11 @@ def register(request):
 
 def verif_otp(request):
     temp_user = request.session.get('temp_user')
-    email=request.user.email
     stored_otp=temp_user['otp']
-    otp_creation_time=temp_user['otp_created_time']
+    otp_creation_time=temp_user['otp_creation_time']
     username=temp_user['username']
     password=temp_user['password']
+    email=temp_user['email']
 # insures that if a person is visiting the page without going through the registration process, they are redirected to the register page
     if not temp_user:
         messages.error(request, "Please register again.")
