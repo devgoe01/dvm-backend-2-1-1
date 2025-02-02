@@ -75,7 +75,7 @@ def verif_bus_otp(request):
     temp_booking = request.session.get('temp_booking')
     entered_otp = request.POST.get('email_otp')
     stored_otp = temp_booking['otp']
-    email=temp_booking['email']
+    email=request.user.email
     seats_booked=temp_booking['seats_booked']
     otp_creation_time = timezone.datetime.fromisoformat(temp_booking['otp_creation_time'])
     bus_number=temp_booking['bus_number']
