@@ -19,3 +19,5 @@ WALLET BALANCE
 DIFFERENT FARE FOR CLASSES
 
 seat classes for editing booking
+
+ADMINS CAN ADD NEW BUSES
