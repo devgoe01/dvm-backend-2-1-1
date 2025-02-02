@@ -87,6 +87,7 @@ def verif_bus_otp(request):
         if entered_otp=="Resend" or entered_otp=="resend" or entered_otp=="ReSend" or entered_otp=="RESEND":
             new_otp = utils.generate_otp()
             temp_booking['otp'] = new_otp
+            temp_booking['otp_creation_time'] = timezone.now().isoformat()
             request.session['temp_booking'] = temp_booking
             send_mail(
                 'New OTP for verification',
