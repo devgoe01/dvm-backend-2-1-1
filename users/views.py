@@ -46,12 +46,12 @@ def register(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
+            
             username = form.cleaned_data['username']
             email = form.cleaned_data['email']
             password = form.cleaned_data['password1']
             email_otp = generate_otp()
             request.session['temp_user'] = {'username': username,'email': email,'password': password,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
-            
             send_mail(
                 'Email Verification OTP',
                 f'Your OTP for email verification is: {email_otp}',

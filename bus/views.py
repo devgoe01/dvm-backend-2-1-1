@@ -59,7 +59,6 @@ def book_bus(request, bus_number):
                 email_otp = utils.generate_otp()
                 request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp,'otp_creation_time': timezone.now().isoformat(),
                 'selected_class': selected_class}
-            
                 send_mail(
                     'Email Verification OTP',
                     f'Your OTP for email verification is: {email_otp}',
@@ -156,7 +155,13 @@ def booking_summary(request):
 def edit_booking(request, booking_id):
     booking=get_object_or_404(Booking, id=booking_id, user=request.user)
     time_remaining=(booking.bus.departure_time - now()).total_seconds() / 3600
-    original_seats_booked=booking.seats_booked
+    seats_booked=booking.seats_booked
+    seats_booked=unpack_booked_seats_class(seats_booked)
+    for i in range(0, len(seats_booked)):
+        if list(seats_booked.values())[i]:
+            selected_class=list(seats_booked.keys())[i]
+            break
+    original_seats_booked=seats_booked['seats_booked']
     if time_remaining < 6:
         messages.error(request, "You cannot edit this booking as there are less than 6 hours left before departure.")
         return redirect('booking_summary')
@@ -167,34 +172,43 @@ def edit_booking(request, booking_id):
         form=EditBookingForm(request.POST,instance=booking)
         if form.is_valid():
             updated_booking=form.save(commit=False)
-            if updated_booking.status == 'Cancelled' or updated_booking.seats_booked==0:
+            new_seats_booked=form.cleaned_data.get('seats_booked')
+            updated_booking.seats_booked=pack_booked_seats(selected_class,new_seats_booked)
+            updated_booking=form.save(commit=False)
+            if updated_booking.status == 'Cancelled' or new_seats_booked==0:
                 updated_booking.status='Cancelled'
-                request.user.wallet_balance +=booking.seats_booked * booking.bus.fare
+                request.user.wallet_balance +=original_seats_booked * booking.bus.fare
                 request.user.save()
-                booking.bus.available_seats += booking.seats_booked
+                available_seats=unpack_available_seats_classes(booking.bus.bus_number)
+                available_seats[selected_class] += original_seats_booked
+                booking.bus.available_seats=pack_available_seats_classes(selected_class,available_seats[selected_class],booking.bus.bus_number)
                 booking.bus.save()
-                updated_booking.seats_booked=original_seats_booked
+                updated_booking.seats_booked=pack_booked_seats(selected_class,original_seats_booked)
                 send_mail(
                     f'Booking cancelled for bus {booking.bus.bus_number} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
-                    f'Booking  for bus {booking.bus.bus_number} has been cancelled.\n{additional_cost} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance} rupees.\n',
+                    f'Booking  for bus {booking.bus.bus_number} has been cancelled.\n{original_seats_booked * booking.bus.fare} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance} rupees.\n',
                     settings.EMAIL_HOST_USER,
                     [request.user.email],
                     fail_silently=False)
                 updated_booking.save()
-            difference=updated_booking.seats_booked - original_seats_booked
+            difference=int(new_seats_booked) - original_seats_booked
             if difference!=0 and updated_booking.status=='Confirmed':
                 additional_cost=difference * booking.bus.fare
                 if request.user.wallet_balance >= additional_cost:
                     request.user.wallet_balance -= additional_cost
                     request.user.save()
-                    booking.bus.available_seats -= difference
+                    available_seats=unpack_available_seats_classes(booking.bus.bus_number)
+                    available_seats[selected_class] -= difference
+                    booking.bus.available_seats=pack_available_seats_classes(selected_class,available_seats[selected_class],booking.bus.bus_number)
                     booking.bus.save()
                     send_mail(
                     f'Updated booking status for bus {booking.bus.bus_number} on {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
-                    f'Booking status for bus {booking.bus.bus_number} has been updated.\n{updated_booking.seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination} \n{additional_cost if (additional_cost>0) else (-1*additional_cost)} rupees have been {"deducted" if difference<0 else "added"} from your wallet. Your current remaining balance is {request.user.wallet_balance} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+
+                    f'Booking status for bus {booking.bus.bus_number} has been updated.\n{new_seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination} \n{additional_cost if (additional_cost>0) else (-1*additional_cost)} rupees have been {"deducted" if difference<0 else "added"} from your wallet. Your current remaining balance is {request.user.wallet_balance} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
                     settings.EMAIL_HOST_USER,
                     [request.user.email],
                     fail_silently=False)
+                    updated_booking.seats_booked=pack_booked_seats(selected_class,new_seats_booked)
                     updated_booking.save()
                     messages.success(request, "Booking updated successfully!")
                     return redirect('booking_summary')

@@ -21,3 +21,7 @@ DIFFERENT FARE FOR CLASSES
 seat classes for editing booking
 
 ADMINS CAN ADD NEW BUSES
+
+default value while editing bookings 
+
+display class which is being booked
