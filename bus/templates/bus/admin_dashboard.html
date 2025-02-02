@@ -4,8 +4,8 @@
     <h2>Welcome, {{ user.username }}</h2>
     <h3>Admin Dashboard</h3>
     <ul>
-        <li><a href="{% url 'admin_dashboard' %}">Manage Buses</a></li>
-        <li><a href="{% url 'admin_dashboard' %}">View Bookings</a></li>
+        <li><a href="{% url 'bus_list' %}">Manage Buses</a></li>
+        <li><a href="{% url 'booking_summary' %}">View Bookings</a></li>
         <li><a href="{% url 'admin_dashboard' %}">Manage Users</a></li>
     </ul>
 {% endblock content %}

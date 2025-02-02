@@ -10,6 +10,8 @@ from datetime import datetime
 from users import utils
 from django.utils import timezone
 from datetime import timedelta
+import openpyxl
+from django.http import HttpResponse
 
 @login_required
 def dashboard(request):
@@ -227,5 +229,34 @@ def admin_bus_list(request):
         messages.error(request, "You do not have permission to edit buses.")
         return redirect('dashboard')
     buses = request.user.can_change_buses.all()
-    print(buses)
     return render(request, 'bus/bus_list.html', {'buses': buses})
+
+@login_required
+def export_buses_to_excel(request):
+    if not request.user.is_authenticated or request.user.role.lower() == 'passenger':
+        messages.error(request, "Sorry, you can't excess this page.")
+        return redirect('dashboard')
+
+    buses = request.user.can_change_buses.all()
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Buses"
+
+    headers = ['Bus Number', 'Route (Source)', 'Route (Destination)', 'Departure Time','Total Seats', 'Available Seats', 'Fare']
+    sheet.append(headers)
+
+    for bus in buses:
+        row = [
+            bus.bus_number,
+            bus.route.source,
+            bus.route.destination,
+            bus.departure_time.strftime('%Y-%m-%d %H:%M:%S'),
+            bus.total_seats,
+            bus.available_seats,
+            bus.fare,
+        ]
+        sheet.append(row)
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="buses.xlsx"'
+    workbook.save(response)
+    return response
