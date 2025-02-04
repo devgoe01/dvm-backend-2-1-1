@@ -355,7 +355,7 @@ def delete_bus(request, bus_number):
             [request.user.email],
             fail_silently=False,
         )
-        return redirect('verif_del_bus_otp')
+        return redirect('verify_delete_bus_otp')
 
     return render(request, 'bus/delete_bus.html', {'bus': bus})
 
@@ -404,8 +404,8 @@ def verif_del_bus_otp(request):
             if (timezone.now() - otp_creation_time) > timedelta(minutes=2):
                 messages.error(request, "OTP has expired. Please request a new one.")
                 return redirect('verify_delete_bus_otp')
-            
-            bookings = Booking.objects.filter(bus_number=bus_number)
+            bus=get_object_or_404(Bus,bus_number=bus_number)
+            bookings = Booking.objects.filter(bus=bus)
 
             for booking in bookings:
                 if booking.status == 'Confirmed':
@@ -416,7 +416,6 @@ def verif_del_bus_otp(request):
                     user.save()
 #                       booking.status = 'Cancelled'
 #                       booking.save()
-                    bus=booking.bus
                     try:
                         send_mail(
                             f'Booking Cancelled for Bus {bus.bus_number}',
