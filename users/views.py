@@ -46,12 +46,27 @@ def register(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
-            
             username = form.cleaned_data['username']
             email = form.cleaned_data['email']
             password = form.cleaned_data['password1']
             email_otp = generate_otp()
-            request.session['temp_user'] = {'username': username,'email': email,'password': password,'otp': email_otp,'otp_creation_time': timezone.now().isoformat()}
+            
+            request.session['temp_user'] = {'username': username,'email': email,
+            'password': password,'otp': email_otp,
+            'otp_creation_time': timezone.now().isoformat(),'otp_resend_attempts' : 1,}
+
+            '''
+            last_resend_time = timezone.datetime.fromisoformat('otp_creation_time')
+            cooldown_period = timedelta(seconds=30)
+            if timezone.now() - last_resend_time < cooldown_period:
+                messages.error(request, "Please wait before requesting another OTP.")
+                return redirect('register')
+            otp_resend_attempts = request.session.get('otp_resend_attempts', 0)
+            max_resend_attempts = 5
+            if otp_resend_attempts >= max_resend_attempts and timezone.now() - last_resend_time < timedelta(minutes=5):
+                messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
+                return redirect('register')
+            '''
             send_mail(
                 'Email Verification OTP',
                 f'Your OTP for email verification is: {email_otp}',
@@ -64,25 +79,36 @@ def register(request):
 
     return render(request, 'users/register.html', {'form': form})
 
+
+
 def verif_otp(request):
     temp_user = request.session.get('temp_user')
+# insures that if a person is visiting the page without going through the registration process, they are redirected to the register page
+    if not temp_user:
+        messages.error(request, "Please register again.")
+        return redirect('register')
     stored_otp=temp_user['otp']
     otp_creation_time=temp_user['otp_creation_time']
     username=temp_user['username']
     password=temp_user['password']
     email=temp_user['email']
-# insures that if a person is visiting the page without going through the registration process, they are redirected to the register page
-    if not temp_user:
-        messages.error(request, "Please register again.")
-        return redirect('register')
-
+    otp_resend_attempts = temp_user['otp_resend_attempts']
+    last_resend_time = timezone.datetime.fromisoformat(temp_user['otp_creation_time'])
     if request.method == 'POST':
         entered_otp = request.POST.get('email_otp')
-        if entered_otp=="Resend" or entered_otp=="resend" or entered_otp=="ReSend" or entered_otp=="RESEND":
+        if entered_otp.lower() == 'resend':
+            cooldown_period = timedelta(seconds=30)
+            if timezone.now() - last_resend_time < cooldown_period:
+                messages.error(request, "Please wait before requesting another OTP.")
+                return redirect('verif_otp')
+            
+            max_resend_attempts = 5
+            if otp_resend_attempts >= max_resend_attempts:
+                messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
+                return redirect('verif_otp')
+            
             new_otp = generate_otp()
             temp_user['otp'] = new_otp
-            temp_user['otp_creation_time'] = timezone.now().isoformat()
-            request.session['temp_user'] = temp_user
             send_mail(
                 'New OTP for verification',
                 f'Your new OTP is: {new_otp}',
@@ -90,7 +116,11 @@ def verif_otp(request):
                 [email],
                 fail_silently=False,
             )
+
+            temp_user['otp_resend_attempts'] = otp_resend_attempts + 1
+            temp_user['otp_creation_time'] = timezone.now().isoformat()
             messages.success(request, "A new OTP has been sent to your email.")
+            request.session['temp_user'] = temp_user
             return redirect('verif_otp')
         if verify_otp(entered_otp,stored_otp):
             otp_creation_time = timezone.datetime.fromisoformat(otp_creation_time)
@@ -107,7 +137,6 @@ def verif_otp(request):
                 fail_silently=False,
             )
             del request.session['temp_user']
-            
             login(request, user)
             messages.success(request, "Your account has been created successfully!")
             return redirect('dashboard')
