@@ -104,7 +104,7 @@ def verif_otp(request):
             
             max_resend_attempts = 5
             if otp_resend_attempts >= max_resend_attempts:
-                messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
+                messages.error(request, "You have exceeded the maximum number of OTP resend attempts.Try registering again after some time")
                 return redirect('verif_otp')
             
             new_otp = generate_otp()

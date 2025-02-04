@@ -57,7 +57,7 @@ def book_bus(request, bus_number):
                 return redirect('book_bus', bus_number=bus_number)
             if user.wallet_balance >= (seats_booked * bus.fare):
                 email_otp = utils.generate_otp()
-                request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp,'otp_creation_time': timezone.now().isoformat(),
+                request.session['temp_booking'] = {'bus_number': booking.bus.bus_number,'seats_booked': seats_booked,'otp': email_otp,'otp_creation_time': timezone.now().isoformat(),'otp_resend_attempts' : 1,
                 'selected_class': selected_class}
                 send_mail(
                     'Email Verification OTP',
@@ -86,13 +86,24 @@ def verif_bus_otp(request):
     email=request.user.email
     selected_class=temp_booking['selected_class']
     seats_booked=temp_booking['seats_booked']
+    otp_resend_attempts = temp_booking['otp_resend_attempts']
+    last_resend_time = timezone.datetime.fromisoformat(temp_booking['otp_creation_time'])
     otp_creation_time = timezone.datetime.fromisoformat(temp_booking['otp_creation_time'])
     bus_number=temp_booking['bus_number']
     if not temp_booking:
         messages.error(request, "Please try again.")
         return redirect('project-home')
     if request.method == 'POST':
-        if entered_otp=="Resend" or entered_otp=="resend" or entered_otp=="ReSend" or entered_otp=="RESEND":
+        if entered_otp.lower()=='resend':
+            cooldown_period = timedelta(seconds=30)
+            if timezone.now() - last_resend_time < cooldown_period:
+                messages.error(request, "Please wait before requesting another OTP. Try booking again after some time.")
+                return redirect('verif_bus_otp')
+            max_resend_attempts = 5
+            if otp_resend_attempts >= max_resend_attempts:
+                messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
+                return redirect('verif_bus_otp')
+            
             new_otp = utils.generate_otp()
             temp_booking['otp'] = new_otp
             temp_booking['otp_creation_time'] = timezone.now().isoformat()
@@ -104,6 +115,10 @@ def verif_bus_otp(request):
                 [email],
                 fail_silently=False,
             )
+
+            temp_booking['otp_resend_attempts'] = otp_resend_attempts + 1
+            temp_booking['otp_creation_time'] = timezone.now().isoformat()
+            request.session['temp_booking'] = temp_booking
             messages.success(request, "A new OTP has been sent to your email.")
             return redirect('verif_bus_otp')
         if utils.verify_otp(entered_otp,stored_otp):
