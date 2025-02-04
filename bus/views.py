@@ -275,7 +275,6 @@ def edit_bus(request, bus_number):
     return render(request, 'bus/edit_bus.html', {'form': form, 'bus': bus})
 
 def admin_bus_list(request):
-    user=request.user
     if (not request.user.is_authenticated) or (request.user.role=='passenger' or request.user.role=='Passenger'):
         messages.error(request, "You do not have permission to edit buses.")
         return redirect('dashboard')
@@ -334,3 +333,104 @@ def add_bus(request):
         form = AddBusForm()
 
     return render(request, 'bus/add_bus.html', {'form': form})
+
+
+@login_required
+def delete_bus(request, bus_number):
+    try:
+        bus = Bus.objects.get(bus_number=bus_number)
+    except:
+        messages.error(request, "Bus not found.")
+        return redirect('dashboard')
+    if request.user.role.lower() != 'admin' or bus not in request.user.can_change_buses.all():
+        messages.error(request, "You do not have permission to delete this bus.")
+        return redirect('dashboard')
+    if request.method == "POST":
+        email_otp = utils.generate_otp()
+        request.session['temp_del'] = {'bus_number': bus_number,'otp': email_otp,'otp_creation_time': timezone.now().isoformat(),'otp_resend_attempts' : 1}
+        send_mail(
+            'OTP for verification',
+            f'Your OTP is: {email_otp}',
+            settings.EMAIL_HOST_USER,
+            [request.user.email],
+            fail_silently=False,
+        )
+        return redirect('verif_del_bus_otp')
+
+    return render(request, 'bus/delete_bus.html', {'bus': bus})
+
+
+@login_required
+def verif_del_bus_otp(request):
+    temp_del = request.session.get('temp_del')
+    entered_otp = request.POST.get('email_otp')
+    stored_otp = temp_del['otp']
+    otp_resend_attempts = temp_del['otp_resend_attempts']
+    last_resend_time = timezone.datetime.fromisoformat(temp_del['otp_creation_time'])
+    otp_creation_time = timezone.datetime.fromisoformat(temp_del['otp_creation_time'])
+    bus_number=temp_del['bus_number']
+    if not temp_del:
+        messages.error(request, "Please try again.")
+        return redirect('project-home')
+    if request.method == 'POST':
+        if entered_otp.lower()=='resend':
+            cooldown_period = timedelta(seconds=30)
+            if timezone.now() - last_resend_time < cooldown_period:
+                messages.error(request, "Please wait before requesting another OTP. Try booking again after some time.")
+                return redirect('verify_delete_bus_otp')
+            max_resend_attempts = 5
+            if otp_resend_attempts >= max_resend_attempts:
+                messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
+                return redirect('verify_delete_bus_otp')
+            
+            new_otp = utils.generate_otp()
+            temp_del['otp'] = new_otp
+            temp_del['otp_creation_time'] = timezone.now().isoformat()
+            request.session['temp_del'] = temp_del
+            send_mail(
+                'New OTP for verification',
+                f'Your new OTP is: {new_otp}',
+                settings.EMAIL_HOST_USER,
+                [request.user.email],
+                fail_silently=False,
+            )
+
+            temp_del['otp_resend_attempts'] = otp_resend_attempts + 1
+            temp_del['otp_creation_time'] = timezone.now().isoformat()
+            request.session['temp_del'] = temp_del
+            messages.success(request, "A new OTP has been sent to your email.")
+            return redirect('verify_delete_bus_otp')
+        if utils.verify_otp(entered_otp,stored_otp):
+            if (timezone.now() - otp_creation_time) > timedelta(minutes=2):
+                messages.error(request, "OTP has expired. Please request a new one.")
+                return redirect('verify_delete_bus_otp')
+            
+            bookings = Booking.objects.filter(bus_number=bus_number)
+
+            for booking in bookings:
+                if booking.status == 'Confirmed':
+                    user = booking.user
+                    seats_booked = unpack_booked_seats_class(booking.seats_booked)
+                    total_refund=booking.bus.fare*(list(seats_booked.values())[2])
+                    user.wallet_balance +=total_refund
+                    user.save()
+#                       booking.status = 'Cancelled'
+#                       booking.save()
+                    bus=booking.bus
+                    try:
+                        send_mail(
+                            f'Booking Cancelled for Bus {bus.bus_number}',
+                            f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nA refund of {total_refund} rupees has been credited to your wallet. Your updated wallet balance is {user.wallet_balance} rupees.\nWe apologize for any inconvenience caused.\n",
+                            settings.EMAIL_HOST_USER,[user.email],fail_silently=False,
+                        )
+                    except:
+                        pass
+            bus.delete()
+            messages.success(request, f"Bus {bus.bus_number} deleted successfully!")
+            if (not temp_del):
+                del request.session['temp_del']
+            return redirect('bus_list')
+        else:
+            messages.error(request, "Invalid OTP. Please try again.")
+            return render(request, 'users/verify_otp.html')
+    return render(request, 'users/verify_otp.html')

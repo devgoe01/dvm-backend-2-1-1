@@ -10,7 +10,8 @@
         <p><strong>Total seats:</strong> {{ bus.total_seats }}</p>
         <p><strong>Available Seats</strong>: {{ bus.available_seats }}</p>
         <p><strong>Fare</strong>: {{ bus.fare }}</p>
-        <a href="{% url 'edit_bus' bus.bus_number %}">Edit</a>
+        <a href="{% url 'edit_bus' bus.bus_number %}" class="btn btn-primary btn-sm">Edit</a>
+        <a href="{% url 'delete_bus' bus.bus_number %}" class="btn btn-danger btn-sm">Delete</a>
         <hr>
     </div>
 {% endfor %}
