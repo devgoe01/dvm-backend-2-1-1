@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404,redirect
 from django.contrib.auth.decorators import login_required
 from .models import User,Route,Bus,Booking
 from django.contrib import messages
-from .forms import SearchForm,BookingForm,EditBookingForm,EditBusForm
+from .forms import SearchForm,BookingForm,EditBookingForm,EditBusForm,AddBusForm
 from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.conf import settings
@@ -155,17 +155,17 @@ def verif_bus_otp(request):
 
 @login_required
 def booking_summary(request):
-    bookings=Booking.objects.filter(user=request.user)
+    bookings=Booking.objects.filter(user=request.user).order_by('-booking_time')
     confirmed_bookings=(bookings.filter(status='Confirmed',user=request.user)).count()
     if (not confirmed_bookings):
         confirmed_bookings='no'
     for booking in bookings:
         time_remaining=(booking.bus.departure_time - now()).total_seconds() /(60*60)
-        booking.can_edit=time_remaining > 6
+        booking.can_edit=time_remaining > 6 
         seats_booked = unpack_booked_seats_class(booking.seats_booked)
         booking.seat_class=list(seats_booked.values())[0]
         booking.seats_booked=list(seats_booked.values())[2]
-    bookings=bookings.order_by('-booking_time')
+    
     context={'bookings':bookings,'confirmed_bookings':confirmed_bookings}
     return render(request, 'bus/booking_summary.html', context)
 
@@ -311,3 +311,26 @@ def export_buses_to_excel(request):
     response['Content-Disposition'] = 'attachment; filename="buses.xlsx"'
     workbook.save(response)
     return response
+
+
+
+
+@login_required
+def add_bus(request):
+    if request.user.role.lower() != 'admin':
+        messages.error(request, "You do not have permission to add buses.")
+        return redirect('dashboard')
+
+    if request.method == "POST":
+        form = AddBusForm(request.POST)
+        if form.is_valid():
+            bus=form.save()
+            messages.success(request, "Bus added successfully!")
+            request.user.can_change_buses.add(bus)
+            return redirect('dashboard')
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = AddBusForm()
+
+    return render(request, 'bus/add_bus.html', {'form': form})

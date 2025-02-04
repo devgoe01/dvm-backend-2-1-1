@@ -14,4 +14,5 @@ urlpatterns = [
     path('verify_bus_otp/', views.verif_bus_otp, name='verif_bus_otp'),
     path('verify_edit_booking_otp/', views.verif_bus_otp, name='edit_booking_otp'),
     path('export/', views.export_buses_to_excel, name='export_buses'),
+    path('add-bus/', views.add_bus, name='add_bus'),
 ]

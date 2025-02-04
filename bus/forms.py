@@ -59,3 +59,13 @@ class EditBusForm(forms.ModelForm):
     class Meta:
         model = models.Bus
         fields = ['route', 'total_seats', 'departure_time', 'fare']
+
+
+
+class AddBusForm(forms.ModelForm):
+    class Meta:
+        model = models.Bus
+        fields = ['route', 'bus_number', 'seat_classes','total_seats','available_seats', 'departure_time', 'fare']
+        widgets = {
+            'departure_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        }

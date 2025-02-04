@@ -25,10 +25,10 @@ class Bus(models.Model):
     route = models.ForeignKey(Route, on_delete=models.CASCADE)
     bus_number = models.PositiveIntegerField(unique=True)
     total_seats = models.PositiveIntegerField()
-    available_seats = models.CharField(default=2-2-2,max_length=11,help_text="Available Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
+    available_seats = models.CharField(max_length=11,help_text="Available Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
     departure_time = models.DateTimeField()
     fare = models.DecimalField(max_digits=6, decimal_places=2)
-    seat_classes = models.CharField(default=2-2-2,max_length=11,help_text="Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
+    seat_classes = models.CharField(max_length=11,help_text="Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
 
     def __str__(self):
         return f"By {self.bus_number} from {self.route.source} to {self.route.destination}"
