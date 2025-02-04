@@ -162,10 +162,10 @@ def booking_summary(request):
     for booking in bookings:
         time_remaining=(booking.bus.departure_time - now()).total_seconds() /(60*60)
         booking.can_edit=time_remaining > 6
-    for booking in bookings:
         seats_booked = unpack_booked_seats_class(booking.seats_booked)
         booking.seat_class=list(seats_booked.values())[0]
         booking.seats_booked=list(seats_booked.values())[2]
+    bookings=bookings.order_by('-booking_time')
     context={'bookings':bookings,'confirmed_bookings':confirmed_bookings}
     return render(request, 'bus/booking_summary.html', context)
 
