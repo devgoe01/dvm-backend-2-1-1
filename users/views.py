@@ -3,7 +3,7 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from .forms import UserUpdateForm, ProfileUpdateForm, UserRegisterForm
+from .forms import UserUpdateForm, ProfileUpdateForm, UserRegisterForm,AddBalanceForm
 from bus.models import User
 from django.contrib.auth import login
 from .utils import generate_otp, verify_otp
@@ -115,3 +115,26 @@ def verif_otp(request):
             messages.error(request, "Invalid OTP. Please try again.")
             return render(request, 'users/verify_otp.html')
     return render(request, 'users/verify_otp.html')
+
+@login_required
+def add_balance(request):
+    if request.method == 'POST':
+        form=AddBalanceForm(request.POST)
+        if form.is_valid():
+            user=request.user
+            amount=form.cleaned_data['Add_amount']
+            user.wallet_balance+=amount
+            user.save()
+            messages.success(request, "Balance added successfully!")
+            try:
+                send_mail(
+                    'Balance Added',
+                    f'{amount} rupees have been successfully added to your account.\n Your balance has been added successfully! Your new balance is: {user.wallet_balance} rupees.',
+                    settings.EMAIL_HOST_USER,
+                    [user.email],
+                    fail_silently=False,
+                )
+            except:
+                pass
+            return redirect('dashboard')
+    return render(request, 'users/add_balance.html',{'form':AddBalanceForm()})

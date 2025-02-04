@@ -16,6 +16,7 @@ urlpatterns = [
     path('verify_otp/', user_views.verif_otp, name='verif_otp'),
     path('accounts/', include('allauth.urls')),
     path('register/', user_views.register, name='register'),
+    path('add-balance/',user_views.add_balance,name='add_balance'),
 ]
 
 

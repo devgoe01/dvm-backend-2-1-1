@@ -1,6 +1,6 @@
 from django import forms
 from . import models
-from.utils import unpack_available_seats_classes
+from.utils import unpack_available_seats_classes,unpack_booked_seats_class
 class BookingForm(forms.ModelForm):
     seats_booked=forms.IntegerField(required=True,label="Number of seats: ")
     seat_class=forms.CharField(required=True,label="Enter seat class general or luxury or sleeper: ")
@@ -38,6 +38,9 @@ class EditBookingForm(forms.ModelForm):
                 route=self.current_booking.bus.route,
                 departure_time=self.current_booking.bus.departure_time
             )
+            self.fields['bus'].widget.attrs['readonly'] = 'readonly'
+            self.fields['seats_booked'].initial =list((unpack_booked_seats_class(self.current_booking.seats_booked)).values())[2]
+            self.fields['seats_booked'].help_text = "enter number of seats you want to be booked for the selected class"
 
     class Meta:
         model = models.Booking
@@ -51,7 +54,6 @@ class EditBookingForm(forms.ModelForm):
             raise forms.ValidationError(f"Only {bus.available_seats} seats are available on this bus.")
 
         return super().cleaned_data()
-    
 
 class EditBusForm(forms.ModelForm):
     class Meta:

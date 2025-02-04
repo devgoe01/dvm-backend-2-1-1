@@ -25,3 +25,5 @@ ADMINS CAN ADD NEW BUSES
 default value while editing bookings 
 
 display class which is being booked
+
+days of week bus is running

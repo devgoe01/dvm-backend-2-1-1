@@ -8,6 +8,7 @@
   {% csrf_token %}
   {{ form|crispy }}
   <p><strong>Fare: </strong>{{ booking.bus.fare }}</p>
+  <p><strong>Class: </strong>{{ booking.seat_class }}</p>
   <button type="submit" class="btn btn-primary">Update Booking</button><hr>
 </form>
 <a href="{% url 'booking_summary'%}" class="btn btn-secondary">Back to Summary</a>

@@ -147,6 +147,10 @@ def booking_summary(request):
     for booking in bookings:
         time_remaining=(booking.bus.departure_time - now()).total_seconds() /(60*60)
         booking.can_edit=time_remaining > 6
+    for booking in bookings:
+        seats_booked = unpack_booked_seats_class(booking.seats_booked)
+        booking.seat_class=list(seats_booked.values())[0]
+        booking.seats_booked=list(seats_booked.values())[2]
     context={'bookings':bookings,'confirmed_bookings':confirmed_bookings}
     return render(request, 'bus/booking_summary.html', context)
 
@@ -184,12 +188,15 @@ def edit_booking(request, booking_id):
                 booking.bus.available_seats=pack_available_seats_classes(selected_class,available_seats[selected_class],booking.bus.bus_number)
                 booking.bus.save()
                 updated_booking.seats_booked=pack_booked_seats(selected_class,original_seats_booked)
-                send_mail(
-                    f'Booking cancelled for bus {booking.bus.bus_number} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
-                    f'Booking  for bus {booking.bus.bus_number} has been cancelled.\n{original_seats_booked * booking.bus.fare} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance} rupees.\n',
-                    settings.EMAIL_HOST_USER,
-                    [request.user.email],
-                    fail_silently=False)
+                try:
+                    send_mail(
+                        f'Booking cancelled for bus {booking.bus.bus_number} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
+                        f'Booking  for bus {booking.bus.bus_number} has been cancelled.\n{original_seats_booked * booking.bus.fare} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance} rupees.\n',
+                        settings.EMAIL_HOST_USER,
+                        [request.user.email],
+                        fail_silently=False)
+                except:
+                    pass
                 updated_booking.save()
             difference=int(new_seats_booked) - original_seats_booked
             if difference!=0 and updated_booking.status=='Confirmed':
@@ -201,13 +208,15 @@ def edit_booking(request, booking_id):
                     available_seats[selected_class] -= difference
                     booking.bus.available_seats=pack_available_seats_classes(selected_class,available_seats[selected_class],booking.bus.bus_number)
                     booking.bus.save()
-                    send_mail(
-                    f'Updated booking status for bus {booking.bus.bus_number} on {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
-
-                    f'Booking status for bus {booking.bus.bus_number} has been updated.\n{new_seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination} \n{additional_cost if (additional_cost>0) else (-1*additional_cost)} rupees have been {"deducted" if difference<0 else "added"} from your wallet. Your current remaining balance is {request.user.wallet_balance} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
-                    settings.EMAIL_HOST_USER,
-                    [request.user.email],
-                    fail_silently=False)
+                    try:
+                        send_mail(
+                        f'Updated booking status for bus {booking.bus.bus_number} on {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
+                        f'Booking status for bus {booking.bus.bus_number} has been updated.\n{new_seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination} \n{additional_cost if (additional_cost>0) else (-1*additional_cost)} rupees have been {"deducted" if difference<0 else "added"} from your wallet. Your current remaining balance is {request.user.wallet_balance} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+                        settings.EMAIL_HOST_USER,
+                        [request.user.email],
+                        fail_silently=False)
+                    except:
+                        pass
                     updated_booking.seats_booked=pack_booked_seats(selected_class,new_seats_booked)
                     updated_booking.save()
                     messages.success(request, "Booking updated successfully!")
@@ -220,9 +229,11 @@ def edit_booking(request, booking_id):
                 return redirect('edit_booking', booking_id=booking_id)
     else:
         form=EditBookingForm(instance=booking, current_booking=booking)
-
+    
+    seats_booked = unpack_booked_seats_class(booking.seats_booked)
+    booking.seat_class=list(seats_booked.values())[1]
     return render(request, 'bus/edit_booking.html', {'form': form, 'booking': booking})
-            
+
 def about(request):
     return render(request, 'bus/about.html', {'title': 'About'})
 

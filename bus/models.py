@@ -42,14 +42,3 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking {self.id} by {self.user.username}"
-    
-
-class SeatClass(models.Model):
-    SEAT_CLASS_CHOICES = [('General', 'General'),('Sleeper', 'Sleeper'),('Luxury', 'Luxury')]
-    bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
-    seat_class = models.CharField(max_length=20, choices=SEAT_CLASS_CHOICES)
-    total_seats = models.PositiveIntegerField()
-    available_seats = models.PositiveIntegerField()
-
-    def __str__(self):
-        return f"{self.seat_class} ({self.available_seats}/{self.total_seats} seats)"
