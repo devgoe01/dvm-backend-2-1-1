@@ -16,9 +16,6 @@ class BookingForm(forms.ModelForm):
             raise forms.ValidationError("Invalid seat class.")
         if seats_booked <= 0:
             raise forms.ValidationError("Number of seats must be greater than 0.")
-        available_seats=int(unpack_available_seats_classes(bus.bus_number)[selected_class])
-        if seats_booked > available_seats :
-            raise forms.ValidationError(f"Only {bus.available_seats} seats are available.")
         return cleaned_data
 
 

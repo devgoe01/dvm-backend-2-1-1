@@ -42,3 +42,16 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking {self.id} by {self.user.username}"
+    
+
+
+
+
+class Waitlist(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
+    seats_requested = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Waitlist entry for {self.user.username} on bus {self.bus.bus_number} ({self.seat_class})"

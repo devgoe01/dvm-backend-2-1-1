@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404,redirect
 from django.contrib.auth.decorators import login_required
-from .models import User,Route,Bus,Booking
+from .models import User,Route,Bus,Booking,Waitlist
 from django.contrib import messages
 from .forms import SearchForm,BookingForm,EditBookingForm,EditBusForm,AddBusForm
 from django.utils.timezone import now
@@ -42,6 +42,7 @@ def home(request):
 def book_bus(request, bus_number):
     bus=get_object_or_404(Bus, bus_number=bus_number)
     available_seats=unpack_available_seats_classes(bus_number)
+    total_available=0.5*sum(available_seats.values())
     if request.method == "POST":
         form=BookingForm(request.POST)
         form.instance.bus=bus
@@ -51,9 +52,14 @@ def book_bus(request, bus_number):
             booking.user=user
             booking.bus=bus
             seats_booked=form.cleaned_data['seats_booked']
+            for i in range(0,3):
+                if seats_booked > list(available_seats.values())[i]:
+                    Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked)
+                    messages.info(request,"not available.You are in the waitlist .We will email you once seats are available.")
+                    return redirect('booking_summary')
             selected_class=form.cleaned_data['seat_class']
             if seats_booked>available_seats[selected_class]:
-                messages.error(request, "not enough available seats in this class.")
+                messages.error(request, "not enough available seats in this class.Try to book in different class.W")
                 return redirect('book_bus', bus_number=bus_number)
             if user.wallet_balance >= (seats_booked * bus.fare):
                 email_otp = utils.generate_otp()
@@ -235,17 +241,21 @@ def edit_booking(request, booking_id):
                     updated_booking.seats_booked=pack_booked_seats(selected_class,new_seats_booked)
                     updated_booking.save()
                     messages.success(request, "Booking updated successfully!")
+                    process_waitlist(booking.bus)
                     return redirect('booking_summary')
                 else:
+                    process_waitlist(booking.bus)
                     messages.error(request, "Insufficient wallet balance for additional seats.")
                     return redirect('edit_booking', booking_id=booking_id)
             elif difference==0:
+                process_waitlist(booking.bus)
                 messages.error(request, "No change in number of seats.")
                 return redirect('edit_booking', booking_id=booking_id)
     else:
         form=EditBookingForm(instance=booking, current_booking=booking)
     
     seats_booked = unpack_booked_seats_class(booking.seats_booked)
+    process_waitlist(booking.bus)
     booking.seat_class=list(seats_booked.values())[1]
     return render(request, 'bus/edit_booking.html', {'form': form, 'booking': booking})
 
@@ -433,3 +443,24 @@ def verif_del_bus_otp(request):
             messages.error(request, "Invalid OTP. Please try again.")
             return render(request, 'users/verify_otp.html')
     return render(request, 'users/verify_otp.html')
+
+
+
+def process_waitlist(bus):
+    from .models import Waitlist
+    available = unpack_available_seats_classes(bus.bus_number)
+    waitlist_entries = Waitlist.objects.filter(bus=bus).order_by('created_at')
+    
+    for entry in waitlist_entries:
+        for i in range(0,3):
+            if entry.seats_requested <= available[i]:
+                send_mail(
+                    f'Seats Available for Bus {bus.bus_number}',
+                    f"Hello {entry.user.username}, seats are now available on bus {bus.bus_number}. Please visit our website to complete your booking.",
+                    settings.EMAIL_HOST_USER,
+                    [entry.user.email],
+                    fail_silently=False,
+                )
+                entry.delete()
+        else:
+            continue

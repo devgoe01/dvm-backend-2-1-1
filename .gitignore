@@ -10,16 +10,14 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/*
-tasks_left.txt
 datadump.json
-
+../vscode/
 !media/default.jpg
 
 *.py[cod]
 *$py.class
 
 *.so
-
 .Python
 build/
 develop-eggs/
