@@ -54,7 +54,8 @@ def book_bus(request, bus_number):
             seats_booked=form.cleaned_data['seats_booked']
             for i in range(0,3):
                 if seats_booked > list(available_seats.values())[i]:
-                    Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked)
+                    waitlist=Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked)
+                    waitlist.save()
                     messages.info(request,"not available.You are in the waitlist .We will email you once seats are available.")
                     return redirect('booking_summary')
             selected_class=form.cleaned_data['seat_class']
@@ -277,8 +278,14 @@ def edit_bus(request, bus_number):
     if request.method == "POST":
         form = EditBusForm(request.POST, instance=bus)
         if form.is_valid():
-            form.save()
+            total_seats = form.cleaned_data['seat_classes']
+            general,sleeper,luxury = map(int, total_seats.split('-'))
+            total_seats=general+sleeper+luxury
+            bus=form.save()
+            bus.total_seats=total_seats
+            bus.save()
             messages.success(request, "Bus updated successfully!")
+            process_waitlist(bus)
             return redirect('dashboard')
     else:
         form = EditBusForm(instance=bus)
@@ -333,7 +340,12 @@ def add_bus(request):
     if request.method == "POST":
         form = AddBusForm(request.POST)
         if form.is_valid():
+            total_seats = form.cleaned_data['seat_classes']
+            general,sleeper,luxury = map(int, total_seats.split('-'))
+            total_seats=general+sleeper+luxury
             bus=form.save()
+            bus.total_seats=total_seats
+            bus.save()
             messages.success(request, "Bus added successfully!")
             request.user.can_change_buses.add(bus)
             return redirect('dashboard')
@@ -452,15 +464,16 @@ def process_waitlist(bus):
     waitlist_entries = Waitlist.objects.filter(bus=bus).order_by('created_at')
     
     for entry in waitlist_entries:
-        for i in range(0,3):
-            if entry.seats_requested <= available[i]:
+        for i in range(0,6):
+            if entry.seats_requested <= list(available.values())[i]:
                 send_mail(
                     f'Seats Available for Bus {bus.bus_number}',
-                    f"Hello {entry.user.username}, seats are now available on bus {bus.bus_number}. Please visit our website to complete your booking.",
+                    f"Hello {entry.user.username}, seats are now available on bus {bus.bus_number}. Please visit our website to complete your booking.\nhttp://127.0.0.1:8000/book/{bus.bus_number}/",
                     settings.EMAIL_HOST_USER,
                     [entry.user.email],
                     fail_silently=False,
                 )
                 entry.delete()
+                break
         else:
             continue

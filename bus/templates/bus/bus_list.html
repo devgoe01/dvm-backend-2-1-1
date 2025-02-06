@@ -7,7 +7,7 @@
         <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
         <p><strong>Route:</strong> {{ bus.route.source }} to {{ bus.route.destination }}</p>
         <p><strong>Departure:</strong> {{ bus.departure_time }}</p>
-        <p><strong>Total seats:</strong> {{ bus.total_seats }}</p>
+        <p><strong>Total seats:</strong> {{ bus.seat_classes }}</p>
         <p><strong>Available Seats</strong>: {{ bus.available_seats }}</p>
         <p><strong>Fare</strong>: {{ bus.fare }}</p>
         <a href="{% url 'edit_bus' bus.bus_number %}" class="btn btn-primary btn-sm">Edit</a>

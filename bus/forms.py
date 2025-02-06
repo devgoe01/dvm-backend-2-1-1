@@ -55,14 +55,21 @@ class EditBookingForm(forms.ModelForm):
 class EditBusForm(forms.ModelForm):
     class Meta:
         model = models.Bus
-        fields = ['route', 'total_seats', 'departure_time', 'fare']
+        fields = ['route', 'seat_classes','available_seats','departure_time', 'fare']
+        
 
 
 
 class AddBusForm(forms.ModelForm):
     class Meta:
         model = models.Bus
-        fields = ['route', 'bus_number', 'seat_classes','total_seats','available_seats', 'departure_time', 'fare']
+        fields = ['route', 'bus_number', 'seat_classes','available_seats', 'departure_time', 'fare']
         widgets = {
             'departure_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fields['seat_classes'].label='total_seats'
+    def clean(self):
+        cleaned_data=super().clean()
+        return cleaned_data

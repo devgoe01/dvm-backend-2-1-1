@@ -24,7 +24,7 @@ class Route(models.Model):
 class Bus(models.Model):
     route = models.ForeignKey(Route, on_delete=models.CASCADE)
     bus_number = models.PositiveIntegerField(unique=True)
-    total_seats = models.PositiveIntegerField()
+    total_seats = models.PositiveIntegerField(blank=True, null=True)
     available_seats = models.CharField(max_length=11,help_text="Available Seat counts for General, Sleeper, and Luxury classes, separated by hyphens. Example: '50-30-10'")
     departure_time = models.DateTimeField()
     fare = models.DecimalField(max_digits=6, decimal_places=2)
@@ -54,4 +54,4 @@ class Waitlist(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Waitlist entry for {self.user.username} on bus {self.bus.bus_number} ({self.seat_class})"
+        return f"Waitlist entry for {self.user.username} on bus {self.bus.bus_number}"
