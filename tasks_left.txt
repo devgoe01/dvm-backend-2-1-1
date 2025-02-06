@@ -2,7 +2,6 @@ Add confirmation prompts for irreversible actions (e.g., canceling bookings or d
 Implement appropriate redirects for unauthorized access atte
 s.
 - Enable passengers to select specific seats during booking.
-- If a bus is fully booked, allow users to join a waitlist and notify them through email if a seat becomes available.
 Phase 3: Deployment
 
 5. **Intermediate Stops and Routes**

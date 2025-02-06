@@ -56,8 +56,8 @@ def book_bus(request, bus_number):
                 if seats_booked > list(available_seats.values())[i]:
                     waitlist=Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked)
                     waitlist.save()
-                    messages.info(request,"not available.You are in the waitlist .We will email you once seats are available.")
-                    return redirect('booking_summary')
+                    messages.info(request,"Seats are not available.You are in the waitlist .We will email you once seats are available.")
+                    return redirect('dashboard')
             selected_class=form.cleaned_data['seat_class']
             if seats_booked>available_seats[selected_class]:
                 messages.error(request, "not enough available seats in this class.Try to book in different class.W")
@@ -323,8 +323,23 @@ def export_buses_to_excel(request):
             bus.fare,
         ]
         sheet.append(row)
+
+    sheet_bookings = workbook.create_sheet(title="Bookings")
+    booking_headers = ['Booking ID', 'User', 'Bus Number', 'Seats Booked', 'Booking Time', 'Status']
+    sheet_bookings.append(booking_headers)
+    bookings = Booking.objects.filter(bus__in=buses)
+    for booking in bookings:
+        row = [
+            booking.id,
+            booking.user.username,
+            booking.bus.bus_number,
+            booking.seats_booked,
+            booking.booking_time.strftime('%Y-%m-%d %H:%M:%S'),
+            booking.status,
+        ]
+        sheet_bookings.append(row)
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename="buses.xlsx"'
+    response['Content-Disposition'] = 'attachment; filename="data.xlsx"'
     workbook.save(response)
     return response
 
