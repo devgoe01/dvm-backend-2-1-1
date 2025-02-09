@@ -1,23 +1,23 @@
 from django import forms
 from . import models
-from.utils import unpack_available_seats_classes,unpack_booked_seats_class
+
+#from.utils import unpack_available_seats_classes,unpack_booked_seats_class
 class BookingForm(forms.ModelForm):
     seats_booked=forms.IntegerField(required=True,label="Number of seats: ")
     seat_class=forms.CharField(required=True,label="Enter seat class general or luxury or sleeper: ")
+#    selected_seats=forms.CharField(required=False,help_text="Comma-separated seat numbers. leave empty if you want seats to be autoassigned")
     class Meta:
         model = models.Booking
         fields = ['seats_booked']
     def clean(self):
         cleaned_data = super().clean()
         seats_booked = cleaned_data.get('seats_booked')
-        bus = self.instance.bus
         selected_class=cleaned_data.get('seat_class')
         if not(selected_class =="General" or selected_class =="Sleeper" or selected_class =="Luxury" or selected_class=="general" or selected_class=="sleeper" or selected_class=="luxury"):
             raise forms.ValidationError("Invalid seat class.")
         if seats_booked <= 0:
             raise forms.ValidationError("Number of seats must be greater than 0.")
         return cleaned_data
-
 
 class SearchForm(forms.Form):
     source = forms.CharField(max_length=20,required=True,label="Source")
@@ -56,9 +56,6 @@ class EditBusForm(forms.ModelForm):
     class Meta:
         model = models.Bus
         fields = ['route', 'seat_classes','available_seats','departure_time', 'fare']
-        
-
-
 
 class AddBusForm(forms.ModelForm):
     class Meta:

@@ -6,14 +6,16 @@ from .forms import SearchForm,BookingForm,EditBookingForm,EditBusForm,AddBusForm
 from django.utils.timezone import now
 from django.core.mail import send_mail
 from django.conf import settings
-from datetime import datetime
 from users import utils
 from django.utils import timezone
 from datetime import timedelta
 import openpyxl
 from django.http import HttpResponse
-from .utils import unpack_available_seats_classes,unpack_booked_seats_class,pack_available_seats_classes,pack_booked_seats
+
+#from .utils import unpack_available_seats_classes,unpack_booked_seats_class,pack_available_seats_classes,pack_booked_seats
 #from .utils import unpack_seat_classes,pack_seat_classes
+
+
 @login_required
 def dashboard(request):    
     if request.user.role == 'admin' or request.user.role=='Administrator':
@@ -474,7 +476,6 @@ def verif_del_bus_otp(request):
 
 
 def process_waitlist(bus):
-    from .models import Waitlist
     available = unpack_available_seats_classes(bus.bus_number)
     waitlist_entries = Waitlist.objects.filter(bus=bus).order_by('created_at')
     

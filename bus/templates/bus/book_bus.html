@@ -6,16 +6,110 @@
   {% csrf_token %}
   <fieldset class="form-group">
       <h1>Book Bus</h1>
-      <p>Bus: {{ bus.bus_number }}</p>
-      <p>Route: {{ bus.route }}</p>
-      <p>Departure Time: {{ bus.departure_time }}</p>
-      <p>Fare: {{ bus.fare }}</p>
-      <p>Available Seats: {{ bus.available_seats }} <p>(general-sleeper-luxury)</p></p>
+      <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
+      <p><strong>Route:</strong> {{ bus.route }}</p>
+      <p><strong>Departure Time:</strong> {{ bus.departure_time }}</p>
+      <p><strong>Fare: </strong>{{ bus.fare }}</p>
+      <p><strong>Available Seats:</strong> {{ bus.available_seats }} <p>(general-sleeper-luxury)</p></p>
       {{ form|crispy }}
   </fieldset>
   <div class="form-group">
-      <button class="btn btn-outline-info" type="submit">Confirm Booking</button>
+    <button type="submit" class="btn btn-primary">Book</button>
   </div>
+<style>
+        .seat-map {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr); /* 5 seats per row */
+            gap: 10px;
+            justify-content: center;
+            margin: 20px auto;
+            max-width: 400px;
+        }
+
+        .seat {
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            line-height: 50px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .general {
+            background-color: #4caf50; /* Green for General */
+        }
+
+        .sleeper {
+            background-color: #ff9800; /* Orange for Sleeper */
+        }
+
+        .luxury {
+            background-color: #f44336; /* Red for Luxury */
+        }
+
+        .booked {
+            background-color: #9e9e9e; /* Gray for Booked */
+            cursor: not-allowed;
+        }
+
+        .seat:hover:not(.booked) {
+            opacity: 0.8;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+</style>
+    <h1 style="text-align:center;">Bus Seat Map</h1>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="seat-map">
+            {% for seat in bus.seats.all %}
+                <div class="seat 
+                    {% if seat.seat_class == 'General' %}general{% elif seat.seat_class == 'Sleeper' %}sleeper{% elif seat.seat_class == 'Luxury' %}luxury{% endif %}
+                    {% if not seat.is_available %} booked{% endif %}"
+                    data-seat-id="{{ seat.id }}">
+                    {{ seat.seat_number }}
+                </div>
+                {% if forloop.counter|divisibleby:"5" %}
+                    <div style="grid-column: span 5;"></div> <!-- Add space between rows -->
+                {% endif %}
+            {% endfor %}
+        </div>
+    </form>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color general"></div> General
+        </div>
+        <div class="legend-item">
+            <div class="legend-color sleeper"></div> Sleeper
+        </div>
+        <div class="legend-item">
+            <div class="legend-color luxury"></div> Luxury
+        </div>
+        <div class="legend-item">
+            <div class="legend-color booked"></div> Booked
+        </div>
+    </div>
 </form>
 
 {% endblock content %}

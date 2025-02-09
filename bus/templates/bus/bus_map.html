@@ -1,0 +1,22 @@
+{% extends "bus/base.html" %}
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    
+    <h3>Select Your Seats</h3>
+    
+    <div class="seat-map">
+      {% for seat in bus.seats.all %}
+          <label>
+              <input type="checkbox" name="selected_seats" value="{{ seat.seat_number }}" {% if not seat.is_available %}disabled{% endif %}>
+              Seat {{ seat.seat_number }} ({{ seat.seat_class }})
+          </label>
+      {% endfor %}
+    </div>
+
+    <h4>Or Auto-Assign Seats</h4>
+    <input type="number" name="num_seats" min="1" placeholder="Number of Seats">
+
+    <button type="submit">Book Now</button>
+</form>
+{% endblock content %}
