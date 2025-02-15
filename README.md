@@ -20,3 +20,5 @@ specific seats
 - Add confirmation prompts for irreversible actions (e.g., canceling bookings or deleting buses).
 
 stops
+
+WAITLIST

@@ -7,6 +7,8 @@
 
 <form method="GET">
   {{ form|crispy }}
+  <label for="travel_date">Travel Date:</label>
+  <input type="date" id="travel_date" name="travel_date" required>
   <button type="submit" class="btn btn-primary">Search</button>
 </form>
 
@@ -17,7 +19,11 @@
     <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
     <p><strong>Route:</strong> {{ bus.route.source }} to {{ bus.route.destination }}</p>
     <p><strong>Departure:</strong> {{ bus.departure_time }}</p>
-    <p><strong>Available Seats:</strong> {{ bus.available_seats }}</p>
+    {% for seat_class in bus.seat_classes.all %}
+      <p><strong>Class:</strong> {{ seat_class.name }}</p>
+      <p><strong>Fare per hour:</strong> {{ bus.fare|floatformat:2}}*{{seat_class.fare_multiplier|floatformat:2 }}</p>
+      <p><strong>Available Seats:</strong> {{ seat_class.seats_available }}/{{ seat_class.total_seats }}</p>
+    {% endfor %}
     <p><strong>Fare:</strong> {{ bus.fare }}</p>
     <a href="{% url 'book_bus' bus.bus_number %}">Book Now</a>
     <hr>
@@ -25,8 +31,4 @@
 {% empty %}
   <p><strong>No buses found for this route.</p>
 {% endfor %}
-
-
 {% endblock content %}
-
-

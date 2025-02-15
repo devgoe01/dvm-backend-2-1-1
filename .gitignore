@@ -13,10 +13,10 @@ media/*
 datadump.json
 ../vscode/
 !media/default.jpg
-
+models.txt
 *.py[cod]
 *$py.class
-
+bus/templates/bus/add_bus copy.html
 *.so
 .Python
 build/

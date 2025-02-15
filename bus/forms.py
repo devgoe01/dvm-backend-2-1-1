@@ -1,29 +1,63 @@
 from django import forms
 from . import models
-
-#from.utils import unpack_available_seats_classes,unpack_booked_seats_class
+from datetime import datetime
 class BookingForm(forms.ModelForm):
-    seats_booked=forms.IntegerField(required=True,label="Number of seats: ")
-    seat_class=forms.CharField(required=True,label="Enter seat class general or luxury or sleeper: ")
-#    selected_seats=forms.CharField(required=False,help_text="Comma-separated seat numbers. leave empty if you want seats to be autoassigned")
+    seats_booked = forms.IntegerField(required=True, label="Number of seats: ")
+    seat_number= forms.CharField(max_length=100, required=False, label="Seat Number:(optional) ")
+    seat_class = forms.ModelChoiceField(queryset=models.Seatclass.objects.all(),required=True,label="Select seat class")
+    start_stop=forms.ChoiceField(required=True,label="Select start stop")
+    end_stop=forms.ChoiceField(required=True,label="Select end stop")
+    travel_date = forms.DateField(required=True, label="Travel Date")
     class Meta:
         model = models.Booking
-        fields = ['seats_booked']
+        fields = ['seats_booked', 'seat_class', 'seat_number','travel_date']
+
+    def __init__(self, *args, **kwargs):
+        bus = kwargs.pop('bus')
+        super().__init__(*args, **kwargs)
+        self.fields['seat_class'].queryset = models.Seatclass.objects.filter(bus=bus)
+        stops = [bus.route.source] + bus.route.intermediate_stops + [bus.route.destination]
+        stop_choices = [(stop, stop) for stop in stops]
+        self.fields['start_stop'].choices = stop_choices
+        self.fields['end_stop'].choices = stop_choices
     def clean(self):
         cleaned_data = super().clean()
         seats_booked = cleaned_data.get('seats_booked')
-        selected_class=cleaned_data.get('seat_class')
-        if not(selected_class =="General" or selected_class =="Sleeper" or selected_class =="Luxury" or selected_class=="general" or selected_class=="sleeper" or selected_class=="luxury"):
-            raise forms.ValidationError("Invalid seat class.")
+        selected_class = cleaned_data.get('seat_class')
+        travel_date = cleaned_data.get('travel_date')
+        day_of_week = travel_date.strftime('%A')
+
+        if day_of_week not in self.bus.operating_days:
+            raise forms.ValidationError(f"This bus does not operate on {day_of_week}.")
+        if travel_date < datetime.now().date():
+            raise forms.ValidationError("Travel date cannot be in the past.")
+        if not selected_class:
+            raise forms.ValidationError("Please select a valid seat class.")
         if seats_booked <= 0:
             raise forms.ValidationError("Number of seats must be greater than 0.")
+        if selected_class.seats_available < seats_booked:
+            raise forms.ValidationError(
+                f"Only {selected_class.seats_available} seats are available in {selected_class.name} class.")
         return cleaned_data
+    def clean_travel_date(self):
+        travel_date = self.cleaned_data.get('travel_date')
+        day_of_week = travel_date.strftime('%A')
+        
+        if day_of_week not in self.bus.operating_days:
+            raise forms.ValidationError(f"This bus does not operate on {day_of_week}.")
+        
+        if travel_date < datetime.now().date():
+            raise forms.ValidationError("Travel date cannot be in the past.")
+        
+        return travel_date
 
 class SearchForm(forms.Form):
-    source = forms.CharField(max_length=20,required=True,label="Source")
-    destination = forms.CharField(max_length=20,required=True,label="Destination")
-    sort_by_departure = forms.BooleanField(required=False,label="check to sort by departure time else by available seats")
-
+    source = forms.CharField(max_length=20, required=True, label="Source")
+    destination = forms.CharField(max_length=20, required=True, label="Destination")
+    sort_by_departure = forms.BooleanField(
+        required=False,
+        label="Check to sort by departure time; otherwise by available seats"
+    )
 
 class EditBookingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -36,37 +70,101 @@ class EditBookingForm(forms.ModelForm):
                 departure_time=self.current_booking.bus.departure_time
             )
             self.fields['bus'].widget.attrs['readonly'] = 'readonly'
-            self.fields['seats_booked'].initial =list((unpack_booked_seats_class(self.current_booking.seats_booked)).values())[2]
-            self.fields['seats_booked'].help_text = "enter number of seats you want to be booked for the selected class"
-
+            self.fields['seats_booked'].initial = self.current_booking.seats_booked
+            self.fields['seat_class'].widget.attrs['readonly'] = 'readonly'
     class Meta:
         model = models.Booking
-        fields = ['bus', 'seats_booked', 'status']
+        fields = ['bus', 'seats_booked', 'status','seat_class']
 
-    def cleaned_data(self):        
-        seats_booked = super().cleaned_data('seats_booked')
-        bus = super().cleaned_data('bus')
+    def clean(self):
+        cleaned_data = super().clean()
+        seats_booked = cleaned_data.get('seats_booked')
+        bus = cleaned_data.get('bus')
+        seat_class = cleaned_data.get('seat_class')
 
-        if bus and seats_booked and (seats_booked is not None) and (seats_booked > bus.available_seats):
-            raise forms.ValidationError(f"Only {bus.available_seats} seats are available on this bus.")
+        if not bus or not seat_class:
+            raise forms.ValidationError("Bus and seat class must be selected.")
+        return cleaned_data
 
-        return super().cleaned_data()
-
-class EditBusForm(forms.ModelForm):
+class AddRouteForm(forms.ModelForm):
+    intermediate_stops=forms.JSONField(required=False,label="Intermediate Stops",help_text="Enter stops separated as a JSON array (eg ['Stop-1', 'Stop-2'])")
+    stop_durations = forms.JSONField(required=True, label="Duration",help_text="Enter durations as a JSON object (e.g., {'City A-City B': 3600, 'City B-City C': 5400}).")
     class Meta:
-        model = models.Bus
-        fields = ['route', 'seat_classes','available_seats','departure_time', 'fare']
+        model = models.Route
+        fields = ['source', 'destination','intermediate_stops','stop_durations']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        intermediate_stops = cleaned_data.get('intermediate_stops',[])
+        if not intermediate_stops:intermediate_stops=[]
+        stop_durations = cleaned_data.get('stop_durations',{})
+        stops=[cleaned_data['source']]+intermediate_stops+[cleaned_data['destination']]
+        for i in range(len(stops)-1):
+            key=f"{stops[i]}-{stops[i+1]}"
+            if key not in stop_durations:
+                raise forms.ValidationError(f"Duration for {key} is missing.")
+        return cleaned_data
 
 class AddBusForm(forms.ModelForm):
+    departure_time = forms.TimeField(required=True, label="Departure Time (HH:MM)",input_formats=['%H:%M'])
     class Meta:
         model = models.Bus
-        fields = ['route', 'bus_number', 'seat_classes','available_seats', 'departure_time', 'fare']
-        widgets = {
-            'departure_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-        }
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
-        self.fields['seat_classes'].label='total_seats'
+        fields = ['bus_number','departure_time', 'base_fare_per_hour','operating_days']
     def clean(self):
-        cleaned_data=super().clean()
+        cleaned_data = super().clean()
+        intermediate_stops = cleaned_data.get('intermediate_stops')
+        if intermediate_stops and not isinstance(intermediate_stops, list):
+            raise forms.ValidationError("Intermediate stops must be a list.")
+        return cleaned_data
+
+class SeatClassForm(forms.ModelForm):
+    seating_arrangement = forms.JSONField(required=False, label="Seating arrangement (JSON) eg {'Seat-1': True, 'Seat-2': False}")
+    class Meta:
+        model = models.Seatclass
+        fields = ['name', 'total_seats', 'seats_available','fare_multiplier']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        total_seats = cleaned_data.get('total_seats')
+        seats_available = cleaned_data.get('seats_available')
+        seating_arrangement = cleaned_data.get('seating_arrangement')
+        if seats_available>total_seats:
+            raise forms.ValidationError("Available seats cannot exceed total seats.")
+        if seating_arrangement and not isinstance(seating_arrangement, dict):
+            raise forms.ValidationError("Seating arrangement must be a JSON object with seat numbers as keys.")
+        if cleaned_data['seats_available'] > cleaned_data['total_seats']:
+            self.add_error('seats_available', "Available seats cannot exceed total seats.")
+        return cleaned_data
+    
+class EditSeatClassForm(forms.ModelForm):
+    seating_arrangement = forms.JSONField(required=False, label="Seating arrangement (JSON) eg {'Seat-1': True, 'Seat-2': False}")
+    class Meta:
+        model = models.Seatclass
+        fields = ['name', 'total_seats', 'seats_available','fare_multiplier']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        total_seats = cleaned_data.get('total_seats')
+        seats_available = cleaned_data.get('seats_available')
+        seating_arrangement = cleaned_data.get('seating_arrangement')
+        if seats_available>total_seats:
+            raise forms.ValidationError("Available seats cannot exceed total seats.")
+        if seating_arrangement and not isinstance(seating_arrangement, dict):
+            raise forms.ValidationError("Seating arrangement must be a JSON object with seat numbers as keys.")
+        if cleaned_data['seats_available'] > cleaned_data['total_seats']:
+            self.add_error('seats_available', "Available seats cannot exceed total seats.")
+        return cleaned_data
+    
+class EditBusForm(forms.ModelForm):
+    intermediate_stops=forms.JSONField(required=False,label="Intermediate Stops",help_text="Enter stops separated as a JSON array")
+    duration = forms.DurationField(required=False, label="Duration (HH:MM:SS)")
+    class Meta:
+        model = models.Bus
+        fields = ['route', 'departure_time', 'base_fare_per_hour']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        intermediate_stops = cleaned_data.get('intermediate_stops')
+        if intermediate_stops and not isinstance(intermediate_stops, list):
+            raise forms.ValidationError("Intermediate stops must be a list.")
         return cleaned_data
