@@ -16,5 +16,6 @@ urlpatterns = [
     path('export/', views.export_buses_to_excel, name='export_buses'),
     path('add-bus/', views.add_bus, name='add_bus'),
     path('delete-bus/<int:bus_number>/', views.delete_bus, name='delete_bus'),
-    path('verify_delete_bus_otp/', views.verif_del_bus_otp, name='verify_delete_bus_otp'),
+    path('verify_delete_bus_otp/', views.verif_del_bus_otp, name='verify_del_bus_otp'),
+    path('bookings/<int:bus_number>/', views.bus_bookings, name='bus_bookings'),
 ]

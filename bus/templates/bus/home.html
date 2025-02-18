@@ -7,8 +7,9 @@
 
 <form method="GET">
   {{ form|crispy }}
+<!--
   <label for="travel_date">Travel Date:</label>
-  <input type="date" id="travel_date" name="travel_date" required>
+  <input type="date" id="travel_date" name="travel_date" required>-->
   <button type="submit" class="btn btn-primary">Search</button>
 </form>
 
@@ -17,14 +18,13 @@
 {% for bus in buses %}
   <div>
     <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
-    <p><strong>Route:</strong> {{ bus.route.source }} to {{ bus.route.destination }}</p>
+    <p><strong>Route:</strong> {{ bus.route.source }} {% if bus.route.intermediate_stops %} to {{bus.route.intermediate_stops}} {% endif %} to {{ bus.route.destination }}</p>
     <p><strong>Departure:</strong> {{ bus.departure_time }}</p>
-    {% for seat_class in bus.seat_classes.all %}
-      <p><strong>Class:</strong> {{ seat_class.name }}</p>
-      <p><strong>Fare per hour:</strong> {{ bus.fare|floatformat:2}}*{{seat_class.fare_multiplier|floatformat:2 }}</p>
-      <p><strong>Available Seats:</strong> {{ seat_class.seats_available }}/{{ seat_class.total_seats }}</p>
-    {% endfor %}
-    <p><strong>Fare:</strong> {{ bus.fare }}</p>
+
+      <p><strong>Class:</strong> {% for seat_class in bus.seat_classes.all %}{{ seat_class.name }} {% endfor %}</p>
+      <p><strong>Fare per hour:</strong>{% for seat_class in bus.seat_classes.all %} {{ bus.base_fare_per_hour|floatformat:0 }}*{{ seat_class.fare_multiplier|floatformat:0 }} {% endfor %}</p>
+      <p><strong>Available Seats:</strong>{% for seat_class in bus.seat_classes.all %} {{ seat_class.seats_available }}/{{ seat_class.total_seats }} {% endfor %}</p>
+
     <a href="{% url 'book_bus' bus.bus_number %}">Book Now</a>
     <hr>
   </div>

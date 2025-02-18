@@ -1,9 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser 
 from django.conf import settings
-from django.utils.timezone import now
 import json
 from datetime import timedelta,datetime
+
 class User(AbstractUser):
     ROLE_CHOICES = (('passenger', 'Passenger'),('admin', 'Administrator'),)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='passenger')
@@ -35,16 +35,15 @@ class Route(models.Model):
         return total_duration
 
     def __str__(self):
-        stops = " → ".join([self.source] + [self.destination])
-        return f"Route: {stops}"
+        stops = " → ".join([self.source] + [stop for stop in (self.intermediate_stops or [])] + [self.destination])
+        return f"Route: {stops} for bus {self.bus.bus_number}"
 
 
 class Bus(models.Model):
-    route = models.OneToOneField(Route, on_delete=models.CASCADE)
-    bus_number = models.PositiveIntegerField(unique=True, primary_key=True,auto_created=True)
-    departure_time = models.TimeField()
+    route = models.OneToOneField(Route, on_delete=models.CASCADE,related_name="bus")
+    bus_number = models.AutoField(primary_key=True,unique=True)
+    departure_time = models.DateTimeField()
     base_fare_per_hour = models.DecimalField(max_digits=6, decimal_places=2)
-    operating_days = models.JSONField(default=list)
 
     def calculate_fare(self, seat_class_multiplier,start_stop,end_stop):
         total_hours=self.route.get_duration_between_stops(start_stop,end_stop).total_seconds()/3600
@@ -54,22 +53,13 @@ class Bus(models.Model):
     def __str__(self):
         return f"Bus {self.bus_number} from {self.route.source} to {self.route.destination}"
 
-class BusInstance(models.Model):
+'''class BusInstance(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="instances")
     travel_date = models.DateField()
 
     def __str__(self):
         return f"{self.bus.bus_number} on {self.travel_date}"
-    def initialize_seat_classes(self):
-        for seat_class in self.bus.seat_classes.all():
-            Seatclass.objects.create(
-                bus_instance=self,
-                name=seat_class.name,
-                total_seats=seat_class.total_seats,
-                seats_available=seat_class.total_seats,
-                fare_multiplier=seat_class.fare_multiplier,
-                seating_arrangement={f"Seat-{i+1}": True for i in range(seat_class.total_seats)},
-            )
+    '''
 
 class Seatclass(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="seat_classes")
@@ -82,25 +72,19 @@ class Seatclass(models.Model):
     class Meta:
         unique_together = ("bus", "name")
 
-    def initialize_seats(self):
-        if not self.seating_arrangement:
-            self.seating_arrangement = {f"Seat-{i+1}": True for i in range(self.total_seats)}
-            self.save()
-
     def __str__(self):
         return f"{self.bus.bus_number} - {self.name}: {self.seats_available}/{self.total_seats} available"
 
 
 class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE,related_name="bookings")
     seat_class = models.ForeignKey(Seatclass, on_delete=models.CASCADE)
     seat_number = models.CharField(max_length=50)
     seats_booked = models.PositiveIntegerField()
     booking_time = models.DateTimeField(auto_now_add=True)
     start_stop = models.CharField(max_length=100)
     end_stop = models.CharField(max_length=100)
-    travel_date = models.DateField(default=now().date())
     status = models.CharField(
         max_length=20,
         choices=[('Confirmed', 'Confirmed'), ('Cancelled', 'Cancelled')],
@@ -126,18 +110,15 @@ class Booking(models.Model):
         try:
             assert False,locals()
         except: pass
+
     def release_seats(self, booking):
         seating_arrangement = booking.seat_class.seating_arrangement.copy()
-        print("Before release:", json.dumps(seating_arrangement, indent=2))
         if booking.seat_number:
             for seat in booking.seat_number.split(', '):
+                seat=int(seat[5:])-1
                 seating_arrangement[seat] = True
                 booking.seat_class.seats_available+=1
-        print("After release:", json.dumps(seating_arrangement, indent=2))
-        booking.seat_class.seating_arrangement = dict(seating_arrangement)
-        booking.seat_class.save(update_fields=['seating_arrangement', 'seats_available'])
-        booking.seat_class.refresh_from_db()
-        print("Database after save:", json.dumps(booking.seat_class.seating_arrangement, indent=2))
+        self.seat_class.save()
 
     def release_excess_seats(self, previous_booking):
         seating_arrangement = previous_booking.seat_class.seating_arrangement
@@ -175,12 +156,12 @@ class Booking(models.Model):
 
     def assign_seats(self):
         seating_arrangement = self.seat_class.seating_arrangement
-
         if self.pk and self.status == 'Cancelled':
             return
-        if len(self.seat_number)!=0:
+        if len(self.seat_number) != 0:
             for seat in self.seat_number.split(', '):
-                self.seat_class.seating_arrangement[seat] = False
+                seat=f"Seat-{int(seat)}"
+                seating_arrangement[seat] = False
                 self.seat_class.save()
         else:
             assigned_seats = []
@@ -190,8 +171,8 @@ class Booking(models.Model):
                     seating_arrangement[seat] = False
                     assigned_seats.append(seat)
                     self.seat_number = ', '.join(assigned_seats)
-        self.seat_class.seating_arrangement = seating_arrangement
         self.seat_class.seats_available -= self.seats_booked
+        self.seat_class.seating_arrangement = seating_arrangement
         self.seat_class.save()
 
     def __str__(self):

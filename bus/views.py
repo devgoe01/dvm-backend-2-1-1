@@ -14,6 +14,7 @@ import openpyxl
 from django.http import HttpResponse
 from decimal import Decimal
 from datetime import datetime
+
 @login_required
 def dashboard(request):
     if request.user.role.lower() == 'admin':
@@ -21,60 +22,32 @@ def dashboard(request):
     else:
         return render(request, 'bus/passenger_dashboard.html')
 
-def home(request):
-    buses = None
-    
-    if request.method == "GET":
-        form = SearchForm(request.GET)
-        
-        if form.is_valid():
-            source = form.cleaned_data['source']
-            destination = form.cleaned_data['destination']
-            travel_date_str = request.GET.get('travel_date')  # Assume this is passed from the frontend
-            
-            try:
-                travel_date = datetime.strptime(travel_date_str, '%Y-%m-%d').date()
-                day_of_week = travel_date.strftime('%A')
-                
-                buses = Bus.objects.filter(
-                    route__source__icontains=source,
-                    route__destination__icontains=destination,
-                    operating_days__contains=[day_of_week]
-                ).annotate(total_seats_available=Sum('seat_classes__total_seats'))
-                
-                sort_by_departure = form.cleaned_data['sort_by_departure']
-                buses = buses.order_by('departure_time' if sort_by_departure else '-total_seats_available')
-            
-            except ValueError:
-                messages.error(request, "Invalid travel date.")
-    
-    else:
-        form = SearchForm()
-    
-    return render(request, 'bus/home.html', {'form': form, 'buses': buses})
-
-
 
 def home(request):
-    buses = None
+    buses = Bus.objects.all()
     if request.method == "GET":
         form = SearchForm(request.GET)
         if form.is_valid():
             source = form.cleaned_data['source']
             destination = form.cleaned_data['destination']
-            travel_date_str = request.GET.get('travel_date')
-            try:
-                travel_date = datetime.strptime(travel_date_str, '%Y-%m-%d').date()
-                day_of_week = travel_date.strftime('%A')
-                buses = Bus.objects.filter(
-                    route__source__icontains=source,
-                    route__destination__icontains=destination,
-                    operating_days__contains=[day_of_week]
-                ).annotate(total_seats_available=Sum('seat_classes__total_seats'))
-                sort_by_departure = form.cleaned_data['sort_by_departure']
+            sort_by_departure = form.cleaned_data['sort_by_departure']
+#           travel_date_str = request.GET.get('travel_date')
+            if form.cleaned_data['see_all_buses']:
+                buses = Bus.objects.all().annotate(total_seats_available=Sum('seat_classes__total_seats'))
+                form=SearchForm()
                 buses=buses.order_by('departure_time' if sort_by_departure else '-total_seats_available')
-            except ValueError:
-                messages.error(request, "Invalid travel date.")
+                return render(request, 'bus/home.html', {'form': form, 'buses': buses})
+            try:
+#                travel_date = datetime.strptime(travel_date_str, '%Y-%m-%d').date()
+#                day_of_week = travel_date.strftime('%A')
+                buses = Bus.objects.filter(
+                    route__source__icontains=source ,
+                    route__destination__icontains=destination,
+#                    operating_days__contains=[day_of_week]
+                ).annotate(total_seats_available=Sum('seat_classes__total_seats'))
+                buses=buses.order_by('departure_time' if sort_by_departure else '-total_seats_available')
+            except :
+                pass
     else:
         form = SearchForm()
     return render(request, 'bus/home.html', {'form': form, 'buses': buses})
@@ -110,8 +83,10 @@ def book_bus(request, bus_number):
                     return redirect('book_bus', bus_number=bus_number)
                 unavailable_seats = []
                 for seat in seat_numbers_list:
+                    seat=f"Seat-{seat}"
                     if not selected_class.seating_arrangement.get(seat):
                         unavailable_seats.append(seat)
+                        a=selected_class.seating_arrangement.get(seat)
                 if unavailable_seats:
                     messages.error(request, f"The following seats are not available: {', '.join(unavailable_seats)}")
                     return redirect('book_bus', bus_number=bus_number)
@@ -136,7 +111,7 @@ def book_bus(request, bus_number):
                     'end_stop':end_stop,
                     'total_cost':total_cost,
                     'seat_numbers': seat_numbers_list,
-                    'travel_date':booking.travel_date,
+#                    'travel_date':booking.travel_date,
                 }
                 send_mail(
                     f'{email_otp}Email Verification OTP',
@@ -207,7 +182,7 @@ def verif_bus_otp(request):
             end_stop=temp_booking['end_stop']
             total_cost=Decimal(temp_booking['total_cost'])
             seat_numbers_list = temp_booking['seat_numbers']
-            travel_date=temp_booking['travel_date']
+#            travel_date=temp_booking['travel_date']
             bus=Bus.objects.get(bus_number=bus_number)
             user.wallet_balance -= (total_cost)
             user.save()
@@ -222,7 +197,7 @@ def verif_bus_otp(request):
                 start_stop=start_stop,
                 end_stop=end_stop,
                 seat_number=', '.join(seat_numbers_list),
-                travel_date=travel_date,
+#                travel_date=travel_date,
             )
             messages.success(request, "Your booking was successful!")
             try:
@@ -245,6 +220,7 @@ def verif_bus_otp(request):
 @login_required
 def edit_booking(request, booking_id):
     booking = get_object_or_404(Booking, id=booking_id, user=request.user)
+    
     time_remaining = (booking.bus.departure_time - now()).total_seconds() / 3600
     if time_remaining < 6 or booking.status == 'Cancelled':
         messages.error(request, "You cannot edit this booking.")
@@ -324,7 +300,7 @@ def booking_summary(request):
     if not confirmed_bookings:
         confirmed_bookings = 'no'
     for booking in bookings:
-        time_remaining = (booking.bus.departure_time - now()).total_seconds() / (60 * 60)
+        time_remaining = (booking.bus.departure_time - timezone.now()).total_seconds() / (60 * 60)
         booking.can_edit = time_remaining > 6
 
     context = {
@@ -407,11 +383,14 @@ def add_bus(request):
             bus.route = route
             bus.save()
             for form in seat_class_forms:
+                seating_arrangement={}
+                seating_arrangement={f"Seat-{i+1}": True for i in range(form.cleaned_data['total_seats'])}
                 seat_class = form.save(commit=False)
                 seat_class.bus = bus
-                seat_class.initialize_seats()
+                seat_class.seating_arrangement=seating_arrangement
                 seat_class.save()
             messages.success(request, "Bus and its route added successfully!")
+            request.user.can_change_buses.add(bus)
             return redirect('dashboard')
         else:
             messages.error(request, "Please correct the errors in the form.")
@@ -424,6 +403,7 @@ def add_bus(request):
         'bus_form': bus_form,
         'seat_class_forms': seat_class_forms,
     })
+
 
 def about(request):
     return render(request, 'bus/about.html', {'title': 'About'})
@@ -474,7 +454,7 @@ def delete_bus(request, bus_number):
             [request.user.email],
             fail_silently=False,
         )
-        return redirect('verif_del_bus_otp')
+        return redirect('verify_del_bus_otp')
 
     return render(request, 'bus/delete_bus.html', {'bus': bus})
 
@@ -485,7 +465,7 @@ def verif_del_bus_otp(request):
     entered_otp = request.POST.get('email_otp')
     stored_otp = temp_del['otp']
     otp_resend_attempts = temp_del['otp_resend_attempts']
-    otp_creation_time = now().isoformat()
+    otp_creation_time = now()
 
     if not temp_del:
         messages.error(request, "Please try again.")
@@ -494,16 +474,16 @@ def verif_del_bus_otp(request):
     if request.method == "POST":
         if entered_otp.lower() == 'resend':
             cooldown_period = timedelta(seconds=30)
-            last_resend_time = now().isoformat()
+            last_resend_time = timezone.datetime.fromisoformat(temp_del['otp_creation_time'])
             
-            if (now() - timedelta(seconds=int(last_resend_time))) < cooldown_period:
+            if timezone.now() - last_resend_time < cooldown_period:
                 messages.error(request, "Please wait before requesting another OTP.")
-                return redirect('verif_del_bus_otp')
+                return redirect('verify_del_bus_otp')
 
             max_resend_attempts = 5
             if otp_resend_attempts >= max_resend_attempts:
                 messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
-                return redirect('verif_del_bus_otp')
+                return redirect('verify_del_bus_otp')
 
             new_otp = utils.generate_otp()
             temp_del['otp'] = new_otp
@@ -519,11 +499,11 @@ def verif_del_bus_otp(request):
             temp_del['otp_resend_attempts'] += 1
             request.session['temp_del'] = temp_del
             messages.success(request, "A new OTP has been sent to your email.")
-            return redirect('verif_del_bus_otp')
+            return redirect('verify_del_bus_otp')
         elif utils.verify_otp(entered_otp, stored_otp):
             if (now() - timedelta(minutes=2)) > otp_creation_time:
                 messages.error(request, "OTP has expired. Please request a new one.")
-                return redirect('verif_del_bus_otp')
+                return redirect('verify_del_bus_otp')
             bus_number = temp_del['bus_number']
             bus=Bus.objects.get(bus_number=bus_number)
             for booking in Booking.objects.filter(bus=bus):
@@ -543,11 +523,10 @@ def verif_del_bus_otp(request):
             Bus.objects.filter(bus_number=bus_number).delete()
             del request.session['temp_del']
             messages.success(request, f"Bus {bus_number} deleted successfully!")
-            return redirect('admin_bus_list')
+            return redirect('bus_list')
         else:
             messages.error(request, "Invalid OTP. Please try again.")
-    return render(request, 'users/verify_delete_bus.html')
-
+    return render(request, 'users/verify_otp.html')
 
 
 def process_waitlist(bus):
@@ -566,3 +545,11 @@ def process_waitlist(bus):
             break
         else:
             continue
+
+@login_required
+def bus_bookings(request, bus_number):
+    if request.user.role=="passenger":
+        messages.error(request, "You do not have permission to view this page.")
+        return redirect('dashboard')
+    bus = get_object_or_404(Bus, bus_number=bus_number)
+    return render(request, 'bus/bus_bookings.html', {'bus': bus})

@@ -1,0 +1,20 @@
+{% extends "bus/base.html" %}
+{% block content %}
+<h1>Bus {{bus.bus_number}} </h1>
+<p><strong>Departure Time:</strong> {{ bus.departure_time }}</p>
+<p><strong>Base Fare Per Hour:</strong> {{ bus.base_fare_per_hour }}</p>
+<h2>Bookings: </h2>
+{% if bus.bookings.exists %}
+{% for booking in bus.bookings.all %}
+<p><strong>Booking ID:</strong> {{ booking.id }}</p>
+<p><strong>Passenger Name:</strong> {{ booking.user }}</p>
+<p><strong>Seats Reserved:</strong> {{ booking.seats_booked }}</p>
+<p><strong>Seat class:</strong> {{ booking.seat_class }}</p>
+<p><strong>Booking Time:</strong> {{ booking.booking_time }}</p>
+<p><strong>seat_number(s): </strong> {{ booking.seat_number }}</p>
+<p><strong>Path: </strong>{{booking.start_stop}} to {{booking.end_stop}}</p>
+{% endfor %}<br>
+{% else %}
+    <p>No bookings available for this bus.</p>
+{% endif %}
+{% endblock content %}
