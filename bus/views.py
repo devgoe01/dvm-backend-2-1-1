@@ -14,6 +14,7 @@ import openpyxl
 from django.http import HttpResponse
 from decimal import Decimal
 from datetime import datetime
+#from celery import shared_task
 
 @login_required
 def dashboard(request):
@@ -93,11 +94,12 @@ def book_bus(request, bus_number):
             else:
                 seat_numbers_list = []
             if seats_booked > selected_class.seats_available:
-                waitlist=Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked,seat_class=selected_class)
+                waitlist=Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked,seat_class=selected_class,status="Pending")
                 waitlist.save()
                 messages.info(request,"Seats are not available.You are in the waitlist .We will email you once seats are available.")
                 return redirect('dashboard')
             total_cost=seats_booked*(bus.calculate_fare(selected_class.fare_multiplier,start_stop,end_stop))
+            total_cost=round(total_cost,2)
             if user.wallet_balance >= total_cost and selected_class.seats_available >= seats_booked:
                 email_otp = utils.generate_otp()
                 request.session['temp_booking'] = {
@@ -114,7 +116,7 @@ def book_bus(request, bus_number):
 #                    'travel_date':booking.travel_date,
                 }
                 send_mail(
-                    f'{email_otp}Email Verification OTP',
+                    f'Email Verification OTP',
                     f'Your OTP for email verification is: {email_otp}',
                     settings.EMAIL_HOST_USER,
                     [request.user.email],
@@ -203,7 +205,7 @@ def verif_bus_otp(request):
             try:
                 send_mail(
                     f'Booking Confirmation for Bus {bus_number}',
-                    f'Your booking for {seats_booked} seats in {selected_class.name} class is confirmed.\n from {start_stop} to {end_stop}.\nYour total cost is {total_cost} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+                    f'Your booking for {seats_booked} seats in {selected_class.name} class is confirmed.\n from {start_stop} to {end_stop}.\nYour total cost is {total_cost:,.2f} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
                     settings.EMAIL_HOST_USER,
                     [request.user.email],
                     fail_silently=False,
@@ -247,7 +249,7 @@ def edit_booking(request, booking_id):
                 try:
                     send_mail(
                         f'Booking cancelled for bus {booking.bus.bus_number} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
-                        f'Booking for bus {booking.bus.bus_number} has been cancelled.\n{x} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance} rupees.\n',
+                        f'Booking for bus {booking.bus.bus_number} has been cancelled.\n{x} rupees have been transferred to your wallet. Your updated balance is {request.user.wallet_balance:.2f} rupees.\n',
                         settings.EMAIL_HOST_USER,
                         [request.user.email],
                         fail_silently=False)
@@ -279,7 +281,7 @@ def edit_booking(request, booking_id):
                 try:
                     send_mail(
                         f'Updated booking status for bus {booking.bus.bus_number} on {booking.bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
-                        f'Booking status for bus {booking.bus.bus_number} has been updated.\n{new_seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination}.\nYour current wallet balance is {request.user.wallet_balance} rupees.',
+                        f'Booking status for bus {booking.bus.bus_number} has been updated.\n{new_seats_booked} seats are booked for bus {booking.bus.bus_number} from {booking.bus.route.source} to {booking.bus.route.destination}.\nYour current wallet balance is {request.user.wallet_balance:.2f} rupees.',
                         settings.EMAIL_HOST_USER,
                         [request.user.email],
                         fail_silently=False)
@@ -514,7 +516,7 @@ def verif_del_bus_otp(request):
                     try:
                         send_mail(
                             f'Booking Cancelled for Bus {bus.bus_number}',
-                            f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nYour updated wallet balance is {user.wallet_balance} rupees.\nWe apologize for any inconvenience caused.\n",
+                            f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nYour updated wallet balance is {user.wallet_balance:,.2f} rupees.\nWe apologize for any inconvenience caused.\n",
                             settings.EMAIL_HOST_USER,[request.user.email],fail_silently=False,
                         )
                     except:
@@ -529,8 +531,9 @@ def verif_del_bus_otp(request):
     return render(request, 'users/verify_otp.html')
 
 
+#@shared_task
 def process_waitlist(bus):
-    waitlist_entries = Waitlist.objects.filter(bus=bus).order_by('created_at')
+    waitlist_entries = Waitlist.objects.filter(bus=bus,status="Pending").order_by('created_at')
     for entry in waitlist_entries:
         seat_class=entry.seat_class
         if entry.seats_requested <= seat_class.seats_available:
@@ -541,7 +544,8 @@ def process_waitlist(bus):
                 [entry.user.email],
                 fail_silently=False,
             )
-            entry.delete()
+            entry.status=="Fulfilled"
+            entry.save()
             break
         else:
             continue

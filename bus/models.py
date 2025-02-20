@@ -40,7 +40,7 @@ class Route(models.Model):
 
 
 class Bus(models.Model):
-    route = models.OneToOneField(Route, on_delete=models.CASCADE,related_name="bus")
+    route = models.OneToOneField(Route, on_delete=models.CASCADE, related_name="bus")
     bus_number = models.AutoField(primary_key=True,unique=True)
     departure_time = models.DateTimeField()
     base_fare_per_hour = models.DecimalField(max_digits=6, decimal_places=2)
@@ -80,7 +80,7 @@ class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE,related_name="bookings")
     seat_class = models.ForeignKey(Seatclass, on_delete=models.CASCADE)
-    seat_number = models.CharField(max_length=50)
+    seat_number = models.CharField()
     seats_booked = models.PositiveIntegerField()
     booking_time = models.DateTimeField(auto_now_add=True)
     start_stop = models.CharField(max_length=100)
@@ -184,6 +184,7 @@ class Waitlist(models.Model):
     seat_class = models.ForeignKey(Seatclass, on_delete=models.CASCADE)
     seats_requested= models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+    status=models.CharField(max_length=20,choices=[('Pending','Pending'),('Fulfilled','Fulfilled')],default='Pending')
 
     def __str__(self):
         return f"Waitlist Entry: {self.user.username} for Bus {self.bus.bus_number} class {self.seat_class.name}"

@@ -38,9 +38,7 @@ class BookingForm(forms.ModelForm):
             raise forms.ValidationError("Please select a valid seat class.")
         if seats_booked <= 0:
             raise forms.ValidationError("Number of seats must be greater than 0.")
-        if seat_class.seats_available < seats_booked:
-            raise forms.ValidationError(
-                f"Only {seat_class.seats_available} seats are available in {seat_class.name} class.")
+
         return cleaned_data
 
 class SearchForm(forms.Form):

@@ -49,8 +49,21 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_celery_beat'
+    'django_celery_beat',
+    'celery',
 ]
+
+# myproject/settings.py
+
+'''# set the celery broker url
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+
+# set the celery result backend
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+# set the celery timezone
+CELERY_TIMEZONE = 'UTC'
+'''
 
 SOCIALACCOUNT_PROVIDERS = {
     "google": {
