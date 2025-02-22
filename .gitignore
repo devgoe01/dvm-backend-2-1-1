@@ -39,7 +39,10 @@ MANIFEST
 
 *.manifest
 *.spec
-
+.env.prod
+.env.dev
+.env
+.env.prod.db
 pip-log.txt
 pip-delete-this-directory.txt
 htmlcov/

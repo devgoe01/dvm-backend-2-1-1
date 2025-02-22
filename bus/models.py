@@ -80,7 +80,7 @@ class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE,related_name="bookings")
     seat_class = models.ForeignKey(Seatclass, on_delete=models.CASCADE)
-    seat_number = models.CharField()
+    seat_number = models.TextField()
     seats_booked = models.PositiveIntegerField()
     booking_time = models.DateTimeField(auto_now_add=True)
     start_stop = models.CharField(max_length=100)

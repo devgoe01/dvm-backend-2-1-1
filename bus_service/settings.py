@@ -22,7 +22,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY')
+SECRET_KEY ='django-insecure-!c#-vc1=0&-kx6wqhb@hkgf67r=9sk!w$89kavpovms+8k1w8#'
 DEBUG = True
 
 # SECURITY WARNING: don't run with debug turned on in production!x
@@ -191,3 +191,6 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'madhugoe05@gmail.com'
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bus_service.settings')
