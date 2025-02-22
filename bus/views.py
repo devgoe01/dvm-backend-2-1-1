@@ -521,6 +521,7 @@ def verif_del_bus_otp(request):
                         )
                     except:
                         pass
+            bus.route.delete()
             bus.delete()
             Bus.objects.filter(bus_number=bus_number).delete()
             del request.session['temp_del']
@@ -544,7 +545,7 @@ def process_waitlist(bus):
                 [entry.user.email],
                 fail_silently=False,
             )
-            entry.status=="Fulfilled"
+            entry.status = "Fulfilled"
             entry.save()
             break
         else:
