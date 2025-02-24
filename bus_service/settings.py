@@ -22,14 +22,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY ='django-insecure-!c#-vc1=0&-kx6wqhb@hkgf67r=9sk!w$89kavpovms+8k1w8#'
-DEBUG = True
+SECRET_KEY = os.environ.get('SECRET_KEY')
+DEBUG = os.environ.get("DEBUG") == "True"
 
 # SECURITY WARNING: don't run with debug turned on in production!x
 
 
-# ALLOWED_HOSTS=os.environ.get("DJANGO_ALLOWED_HOSTS").split(" ")
-ALLOWED_HOSTS = ['127.0.0.1']
+ALLOWED_HOSTS=os.environ.get("DJANGO_ALLOWED_HOSTS").split(" ")
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS").split(" ")
 
 # Application definition
 
@@ -118,10 +118,10 @@ DATABASES = {
     "default": {
         "ENGINE": os.environ.get("SQL_ENGINE", "django.db.backends.sqlite3"),
         "NAME": os.environ.get("POSTGRES_DB", os.path.join(BASE_DIR, "db.sqlite3")),
-        "USER": os.environ.get("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "hphphphp"),
-        "HOST": os.environ.get("SQL_HOST", "localhost"),
-        "PORT": os.environ.get("SQL_PORT", "5432"),
+        "USER": os.environ.get("POSTGRES_USER"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+        "HOST": os.environ.get("SQL_HOST"),
+        "PORT": os.environ.get("SQL_PORT"),
     }
 }
 
@@ -164,9 +164,6 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
-
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'bus', 'static')]
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -175,11 +172,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'bus', 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGIN_URL = 'login'
-LOGOUT_REDIRECT_URL='project-home'
 AUTH_USER_MODEL='bus.User'
 SOCIALACCOUNT_AUTO_SIGNUP = True
 ACCOUNT_UNIQUE_EMAIL = True

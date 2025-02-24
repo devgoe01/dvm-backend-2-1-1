@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import User, Route, Bus, Booking, Seatclass,Waitlist
+from .models import User, Bus, Booking, Seatclass,Waitlist,Otps
 from django.contrib import messages
 from .forms import SearchForm, BookingForm,AddRouteForm, EditBookingForm, EditBusForm, AddBusForm,SeatClassForm
 from django.utils.timezone import now
@@ -101,14 +101,26 @@ def book_bus(request, bus_number):
             total_cost=seats_booked*(bus.calculate_fare(selected_class.fare_multiplier,start_stop,end_stop))
             total_cost=round(total_cost,2)
             if user.wallet_balance >= total_cost and selected_class.seats_available >= seats_booked:
+
+
+                if Otps.objects.get(email=request.user.email).exists():
+                    otp_field= Otps.objects.filter(email=request.user.email).order_by('-created_at').first()
+                    if ((otp_field.created_at - now().isoformat()).total_seconds() <240) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [1,2]:
+                        resend_attempts=otp_field.otp_resend_attempts
+                    if ((otp_field.created_at - now().isoformat()).total_seconds() <600) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [3,4,5]:
+                        messages.error(request, "Wait for some time before requesting an otp again.")
+                        return redirect('dashboard')
+
+                if not resend_attempts:
+                    resend_attempts=0
                 email_otp = utils.generate_otp()
+                
+                otp=Otps.objects.create(otp_code=email_otp,email=request.user.email,otp_resend_attempts=resend_attempts)
                 request.session['temp_booking'] = {
+                    'otp_pk':otp.pk,
                     'bus_number': booking.bus.bus_number,
                     'seats_booked': seats_booked,
                     'otp': email_otp,
-                    'otp_creation_time': now().isoformat(),
-                    'selected_class': selected_class.id,
-                    'otp_resend_attempts' : 1,
                     'start_stop':start_stop,
                     'end_stop':end_stop,
                     'total_cost':total_cost,
@@ -133,31 +145,32 @@ def book_bus(request, bus_number):
 
 @login_required
 def verif_bus_otp(request):
-    temp_booking = request.session.get('temp_booking')
+    temp_booking = request.session.get('temp_booking', {})
+    otp_id = temp_booking.get('otp_pk')
+    otp=Otps.objects.get(pk=otp_id)
     if not temp_booking:
         messages.error(request, "Please try again.")
         return redirect('dashboard')
-    otp_resend_attempts = temp_booking['otp_resend_attempts']
-    last_resend_time = timezone.datetime.fromisoformat(temp_booking['otp_creation_time'])
-    stored_otp = temp_booking['otp']
+    otp_resend_attempts = otp.otp_resend_attempts
+    last_resend_time = timezone.datetime.fromisoformat(otp.created_at)
+    stored_otp = otp.otp_code
     otp_creation_time = now()
 
     if request.method == "POST":
         entered_otp = request.POST.get('email_otp')
         if entered_otp.lower()=='resend':
+
             cooldown_period = timedelta(seconds=30)
             if timezone.now() - last_resend_time < cooldown_period:
                 messages.error(request, "Please wait before requesting another OTP. Try booking again after some time.")
                 return redirect('verif_bus_otp')
-            max_resend_attempts = 5
-            if otp_resend_attempts >= max_resend_attempts:
+
+            if not otp.can_resend():
                 messages.error(request, "You have exceeded the maximum number of OTP resend attempts.")
                 return redirect('verif_bus_otp')
-            
+
             new_otp = utils.generate_otp()
-            temp_booking['otp'] = new_otp
-            temp_booking['otp_creation_time'] = timezone.now().isoformat()
-            request.session['temp_booking'] = temp_booking
+            otp.resend_otp(new_otp)
             send_mail(
                 'New OTP for verification',
                 f'Your new OTP is: {new_otp}',
@@ -165,14 +178,10 @@ def verif_bus_otp(request):
                 [request.user.email],
                 fail_silently=False,
             )
-
-            temp_booking['otp_resend_attempts'] = otp_resend_attempts + 1
-            temp_booking['otp_creation_time'] = timezone.now().isoformat()
-            request.session['temp_booking'] = temp_booking
             messages.success(request, "A new OTP has been sent to your email.")
             return redirect('verif_bus_otp')
-        if utils.verify_otp(entered_otp, stored_otp):
-            if (now() - timedelta(minutes=2)) > otp_creation_time:
+        if utils.verify_otp(otp.otp_code, stored_otp):
+            if otp.is_expired():
                 messages.error(request, "OTP has expired. Please request a new one.")
                 return redirect('verif_bus_otp')
             user = request.user

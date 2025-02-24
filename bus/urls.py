@@ -1,5 +1,8 @@
 from django.urls import path
 from . import views
+from django.conf import settings
+from django.conf.urls.static import static
+
 urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('passenger/dashboard/', views.dashboard, name='passenger_dashboard'),
@@ -19,3 +22,7 @@ urlpatterns = [
     path('verify_delete_bus_otp/', views.verif_del_bus_otp, name='verify_del_bus_otp'),
     path('bookings/<int:bus_number>/', views.bus_bookings, name='bus_bookings'),
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

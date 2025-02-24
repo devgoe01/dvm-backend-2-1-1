@@ -1,28 +1,28 @@
-# pull official base image
-FROM python:3.11.4-slim-buster
+# Base image for Python 3.11 slim version.
+FROM python:3.11-slim
 
-# set work directory
-WORKDIR .
+# Set environment variables.
+ENV PYTHONDONTWRITEBYTECODE 1 \
+    PYTHONUNBUFFERED 1
 
-# set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Set working directory.
+WORKDIR /bus_service
 
-# install system dependencies
-RUN apt-get update && apt-get install -y netcat
+# Install system dependencies.
+RUN apt-get update && apt-get install -y netcat-openbsd gcc postgresql-client && apt-get clean
 
-# install dependencies
-RUN pip install --upgrade pip
-COPY ./requirements.txt .
-RUN pip install -r requirements.txt
+# Install Python dependencies.
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# copy entrypoint.sh
-COPY entrypoint.sh .
-RUN sed -i 's/\r$//g' ./entrypoint.sh
-RUN chmod +x ./entrypoint.sh
-
-# copy project
+# Copy project files.
 COPY . .
 
-# run entrypoint.sh
-ENTRYPOINT ["./entrypoint.sh"]
+# Add entrypoint script and make it executable.
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose port 8000 for internal communication.
+EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -42,6 +42,8 @@ MANIFEST
 .env.prod
 .env.dev
 .env
+bus/models2.py
+bus/forms2.py
 .env.prod.db
 pip-log.txt
 pip-delete-this-directory.txt
