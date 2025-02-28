@@ -115,7 +115,7 @@ class SeatClassForm(forms.ModelForm):
         if total_seats <= 0:
             raise forms.ValidationError("Total seats must be greater than 0.")
         return cleaned_data
-
+'''
 class EditBookingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.current_booking = kwargs.pop('current_booking', None)
@@ -131,7 +131,9 @@ class EditBookingForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         return cleaned_data
-
+'''
+class EditBookingForm(forms.ModelForm):
+    pass
 class EditBusForm(forms.ModelForm):
     class Meta:
         model = models.Bus
