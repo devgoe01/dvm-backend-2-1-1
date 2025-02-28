@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from .models import User, Bus, Booking, Seatclass,Waitlist,Otps
+from .models import User, Bus, Booking, Seatclass,Waitlist,Otps,Seat,RouteStop,Stop,BusRoute
 from django.contrib import messages
 from .forms import SearchForm, BookingForm,AddRouteForm, EditBookingForm, EditBusForm, AddBusForm,SeatClassForm
 from django.utils.timezone import now
@@ -23,9 +23,8 @@ def dashboard(request):
     else:
         return render(request, 'bus/passenger_dashboard.html')
 
-
 def home(request):
-    buses = Bus.objects.all()
+    buses = Bus.objects.select_related('route').prefetch_related('route__stops', 'seat_classes')
     if request.method == "GET":
         form = SearchForm(request.GET)
         if form.is_valid():
@@ -34,25 +33,32 @@ def home(request):
             sort_by_departure = form.cleaned_data['sort_by_departure']
 #           travel_date_str = request.GET.get('travel_date')
             if form.cleaned_data['see_all_buses']:
-                buses = Bus.objects.all().annotate(total_seats_available=Sum('seat_classes__total_seats'))
-                form=SearchForm()
-                buses=buses.order_by('departure_time' if sort_by_departure else '-total_seats_available')
+                buses = Bus.objects.annotate(
+                    total_seats_available=Sum('seat_classes__total_seats')
+                ).order_by('departure_time' if sort_by_departure else '-total_seats_available')
                 return render(request, 'bus/home.html', {'form': form, 'buses': buses})
+            
             try:
 #                travel_date = datetime.strptime(travel_date_str, '%Y-%m-%d').date()
 #                day_of_week = travel_date.strftime('%A')
-                buses = Bus.objects.filter(
-                    route__source__icontains=source ,
-                    route__destination__icontains=destination,
-#                    operating_days__contains=[day_of_week]
-                ).annotate(total_seats_available=Sum('seat_classes__total_seats'))
-                buses=buses.order_by('departure_time' if sort_by_departure else '-total_seats_available')
-            except :
-                pass
+                source_stops = RouteStop.objects.filter(stop=source)
+                destination_stops = RouteStop.objects.filter(stop=destination)
+                valid_routes = []
+                for source_stop in source_stops:
+                    destination_stop = destination_stops.filter(
+                        bus_route=source_stop.bus_route, 
+                        order__gt=source_stop.order
+                        ).first()
+                    if destination_stop:
+                        valid_routes.append(source_stop.bus_route)
+#                operating_days__contains=[day_of_week]
+                buses = Bus.objects.filter(route__in=valid_routes).annotate(
+                    total_seats_available=Sum('seat_classes__total_seats')
+                ).order_by('departure_time' if sort_by_departure else '-total_seats_available')
+            except: messages.error(request, "An error occurred.")
     else:
         form = SearchForm()
     return render(request, 'bus/home.html', {'form': form, 'buses': buses})
-
 
 @login_required
 def book_bus(request, bus_number):
@@ -69,40 +75,46 @@ def book_bus(request, bus_number):
             seats_booked = form.cleaned_data['seats_booked']
             start_stop=form.cleaned_data['start_stop']
             end_stop=form.cleaned_data['end_stop']
-            seat_numbers = form.cleaned_data['seat_number']
-            stops=[bus.route.source]+bus.route.intermediate_stops+[bus.route.destination]
-            if start_stop not in stops or end_stop not in stops:
+            seat_numbers_input = form.cleaned_data['seat_number']
+            ''' stops=[bus.route.source]+bus.route.intermediate_stops+[bus.route.destination]'''
+            ''' if start_stop not in stops or end_stop not in stops:
                 messages.error(request, "Invalid start stop or end stop")
                 return redirect('book_bus', bus_number=bus_number)
             if stops.index(start_stop) >= stops.index(end_stop):
                 messages.error(request, "Start stop must be before end stop")
+                return redirect('book_bus', bus_number=bus_number)'''
+            if not bus.are_seats_available(seats_booked,start_stop,end_stop,selected_class):
+                messages.error(request, "Seats are not available")
                 return redirect('book_bus', bus_number=bus_number)
-            if seat_numbers:
-                seat_numbers_list = [s.strip() for s in seat_numbers.split(',')]
+            
+            if seat_numbers_input:
+                seat_numbers_list = [s.strip() for s in seat_numbers_input.split(',')]
                 if len(seat_numbers_list) != seats_booked:
                     messages.error(request, "Number of seats booked does not match the entered seat numbers.")
                     return redirect('book_bus', bus_number=bus_number)
-                unavailable_seats = []
-                for seat in seat_numbers_list:
-                    seat=f"Seat-{seat}"
-                    if not selected_class.seating_arrangement.get(seat):
-                        unavailable_seats.append(seat)
-                        a=selected_class.seating_arrangement.get(seat)
-                if unavailable_seats:
+                are_booked,unavailable_seats=Seat.are_seats_booked(bus, seat_numbers_list, start_stop, end_stop, selected_class)
+                if are_booked:
                     messages.error(request, f"The following seats are not available: {', '.join(unavailable_seats)}")
                     return redirect('book_bus', bus_number=bus_number)
-            else:
-                seat_numbers_list = []
-            if seats_booked > selected_class.seats_available:
+##############
+##############
+##############
+##############
+##############
+##############
+##############
+##############
+            '''if seats_booked > selected_class.seats_available:
                 waitlist=Waitlist.objects.create(user=user,bus=bus,seats_requested=seats_booked,seat_class=selected_class,status="Pending")
                 waitlist.save()
                 messages.info(request,"Seats are not available.You are in the waitlist .We will email you once seats are available.")
-                return redirect('dashboard')
-            total_cost=seats_booked*(bus.calculate_fare(selected_class.fare_multiplier,start_stop,end_stop))
-            total_cost=round(total_cost,2)
-            if user.wallet_balance >= total_cost and selected_class.seats_available >= seats_booked:
+                return redirect('dashboard')'''
+            
 
 
+            total_cost=(bus.calculate_fare(start_stop,end_stop,selected_class.fare_multiplier,seats_booked))
+
+            if user.wallet_balance >= Decimal(total_cost):
                 if Otps.objects.get(email=request.user.email).exists():
                     otp_field= Otps.objects.filter(email=request.user.email).order_by('-created_at').first()
                     if ((otp_field.created_at - now().isoformat()).total_seconds() <240) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [1,2]:
@@ -124,7 +136,7 @@ def book_bus(request, bus_number):
                     'start_stop':start_stop,
                     'end_stop':end_stop,
                     'total_cost':total_cost,
-                    'seat_numbers': seat_numbers_list,
+                    'seat_numbers_list': seat_numbers_list if seat_numbers_input else None,
 #                    'travel_date':booking.travel_date,
                 }
                 send_mail(
@@ -161,7 +173,7 @@ def verif_bus_otp(request):
         if entered_otp.lower()=='resend':
 
             cooldown_period = timedelta(seconds=30)
-            if timezone.now() - last_resend_time < cooldown_period:
+            if (now() - last_resend_time) < cooldown_period:
                 messages.error(request, "Please wait before requesting another OTP. Try booking again after some time.")
                 return redirect('verif_bus_otp')
 
@@ -192,8 +204,11 @@ def verif_bus_otp(request):
             start_stop=temp_booking['start_stop']
             end_stop=temp_booking['end_stop']
             total_cost=Decimal(temp_booking['total_cost'])
-            seat_numbers_list = temp_booking['seat_numbers']
+            seat_numbers_list = temp_booking['seat_numbers_list']
 #            travel_date=temp_booking['travel_date']
+            if not all([bus_number, seats_booked, selected_class_id, start_stop, end_stop]):
+                messages.error(request, "Session data is incomplete. Please try booking again.")
+                return redirect('dashboard')
             bus=Bus.objects.get(bus_number=bus_number)
             user.wallet_balance -= (total_cost)
             user.save()
@@ -207,7 +222,7 @@ def verif_bus_otp(request):
                 status='Confirmed',
                 start_stop=start_stop,
                 end_stop=end_stop,
-                seat_number=', '.join(seat_numbers_list),
+                seat_numbers= seat_numbers_list if seat_numbers_list else None,
 #                travel_date=travel_date,
             )
             messages.success(request, "Your booking was successful!")
@@ -224,9 +239,7 @@ def verif_bus_otp(request):
             return redirect('booking_summary')
         else:
             messages.error(request, "Invalid OTP. Please try again.")
-    
     return render(request, 'users/verify_otp.html')
-
 
 @login_required
 def edit_booking(request, booking_id):
@@ -306,54 +319,49 @@ def edit_booking(request, booking_id):
 
 @login_required
 def booking_summary(request):
-    bookings = Booking.objects.filter(user=request.user).order_by('-booking_time')
+    bookings = Booking.objects.filter(user=request.user).select_related('bus', 'start_stop', 'end_stop').order_by('-booking_time')
     confirmed_bookings = bookings.filter(status='Confirmed').count()
     if not confirmed_bookings:
         confirmed_bookings = 'no'
     for booking in bookings:
         time_remaining = (booking.bus.departure_time - timezone.now()).total_seconds() / (60 * 60)
         booking.can_edit = time_remaining > 6
-
     context = {
         'bookings': bookings,
         'confirmed_bookings': confirmed_bookings,
     }
     return render(request, 'bus/booking_summary.html', context)
 
-
 @login_required
 def admin_bus_list(request):
-    if request.user.role.lower() != 'admin':
+    if not request.user.is_admin():
         messages.error(request, "You do not have permission to view this page.")
         return redirect('dashboard')
-
-    buses = request.user.can_change_buses.all()
+    buses = request.user.can_change_buses.select_related('route').all()
     return render(request, 'bus/bus_list.html', {'buses': buses})
-
 
 @login_required
 def export_buses_to_excel(request):
-    if not request.user.is_authenticated or request.user.role.lower() == 'passenger':
+    if not request.user.is_admin():
         messages.error(request, "You do not have permission to export data.")
         return redirect('dashboard')
-
-    buses = request.user.can_change_buses.all()
-    
+    buses = request.user.can_change_buses.select_related('route').prefetch_related('seat_classes', 'bookings').all()
     workbook = openpyxl.Workbook()
     sheet_buses = workbook.active
     sheet_buses.title = "Buses"
-    
     headers_buses = ['Bus Number', 'Route Source', 'Route Destination', 'Departure Time', 'Total Seats', 'Available Seats', 'Fare']
     sheet_buses.append(headers_buses)
-
     for bus in buses:
+        total_seats = sum(cls.total_seats for cls in bus.seat_classes.all())
+        available_seats = sum(len(bus.get_all_available_seats(None, None, cls)) for cls in bus.seat_classes.all())  
+        
         row_buses = [
             bus.bus_number,
-            bus.route.source,
-            bus.route.destination,
+            bus.route.get_ordered_stops().first().stop.name if bus.route.get_ordered_stops().exists() else "N/A",
+            bus.route.get_ordered_stops().last().stop.name if bus.route.get_ordered_stops().exists() else "N/A",
             bus.departure_time.strftime('%Y-%m-%d %H:%M:%S'),
-            sum(cls.total_seats for cls in bus.seat_classes.all()),
-            sum(cls.seats_available for cls in bus.seat_classes.all()),
+            total_seats,
+            available_seats,
             bus.base_fare_per_hour,
         ]
         sheet_buses.append(row_buses)
@@ -361,14 +369,14 @@ def export_buses_to_excel(request):
     sheet_bookings = workbook.create_sheet(title="Bookings")
     headers_bookings = ['Booking ID', 'User', 'Bus Number', 'Seat Class', 'Seats Booked', 'Booking Time', 'Status']
     sheet_bookings.append(headers_bookings)
-    bookings = Booking.objects.filter(bus__in=buses)
+    bookings = Booking.objects.filter(bus__in=buses).select_related('user', 'seat_class')
     for booking in bookings:
         row_bookings = [
             booking.id,
             booking.user.username,
             booking.bus.bus_number,
             booking.seat_class.name,
-            booking.seats_booked,
+            booking.seats.count(),  
             booking.booking_time.strftime('%Y-%m-%d %H:%M:%S'),
             booking.status,
         ]
@@ -379,42 +387,54 @@ def export_buses_to_excel(request):
     return response
 
 @login_required
-def add_bus(request):
-    if request.user.role.lower() != 'admin':
-        messages.error(request, "You do not have permission to add buses.")
+def add_route(request):
+    if not request.user.is_admin():
+        messages.error(request, "You do not have permission to add routes.")
         return redirect('dashboard')
     if request.method == "POST":
-        bus_form = AddBusForm(request.POST)
         route_form = AddRouteForm(request.POST)
-        bus_form = AddBusForm(request.POST)
-        seat_class_forms = [SeatClassForm(request.POST, prefix=f'seat_class_{i}') for i in range(1, 4)]
-        if route_form.is_valid() and bus_form.is_valid() and all(form.is_valid() for form in seat_class_forms):
+        if route_form.is_valid():
             route = route_form.save()
-            bus = bus_form.save(commit=False)
-            bus.route = route
-            bus.save()
-            for form in seat_class_forms:
-                seating_arrangement={}
-                seating_arrangement={f"Seat-{i+1}": True for i in range(form.cleaned_data['total_seats'])}
-                seat_class = form.save(commit=False)
-                seat_class.bus = bus
-                seat_class.seating_arrangement=seating_arrangement
-                seat_class.save()
-            messages.success(request, "Bus and its route added successfully!")
-            request.user.can_change_buses.add(bus)
-            return redirect('dashboard')
+            stops_list = route_form.cleaned_data['stops_list']
+            for stop_name, order in stops_list:
+                stop, _ = Stop.objects.get_or_create(name=stop_name)
+                RouteStop.objects.create(bus_route=route, stop=stop, order=order)
+            messages.success(request, "Route added successfully!")
+            return redirect('add_bus')  
         else:
             messages.error(request, "Please correct the errors in the form.")
     else:
         route_form = AddRouteForm()
+    return render(request, 'bus/add_route.html', {'route_form': route_form})
+
+@login_required
+def add_bus(request):
+    if not request.user.is_admin():
+        messages.error(request, "You do not have permission to add buses.")
+        return redirect('dashboard')
+    if request.method == "POST":
+        bus_form = AddBusForm(request.POST)
+        seat_class_forms = [SeatClassForm(request.POST, prefix=f'seat_class_{i}') for i in range(1, 4)]
+        if bus_form.is_valid() and all(form.is_valid() for form in seat_class_forms):
+            bus = bus_form.save()
+            for form in seat_class_forms:
+                seat_class = form.save(commit=False)
+                seat_class.bus = bus
+                seat_class.save()
+            bus.initialize_seats()
+            request.user.can_change_buses.add(bus)
+            messages.success(request, "Bus and its seat classes added successfully!")
+            return redirect('dashboard')
+        else:
+            messages.error(request, "Please correct the errors in the form.")
+    else:
         bus_form = AddBusForm()
         seat_class_forms = [SeatClassForm(prefix=f'seat_class_{i}') for i in range(1, 4)]
+
     return render(request, 'bus/add_bus.html', {
-        'route_form': route_form,
         'bus_form': bus_form,
         'seat_class_forms': seat_class_forms,
     })
-
 
 def about(request):
     return render(request, 'bus/about.html', {'title': 'About'})
@@ -436,7 +456,6 @@ def edit_bus(request, bus_number):
     else:
         form = EditBusForm(instance=bus)
     return render(request, 'bus/edit_bus.html', {'form': form})
-
 
 @login_required
 def delete_bus(request, bus_number):
@@ -468,7 +487,6 @@ def delete_bus(request, bus_number):
         return redirect('verify_del_bus_otp')
 
     return render(request, 'bus/delete_bus.html', {'bus': bus})
-
 
 @login_required
 def verif_del_bus_otp(request):
@@ -539,7 +557,6 @@ def verif_del_bus_otp(request):
         else:
             messages.error(request, "Invalid OTP. Please try again.")
     return render(request, 'users/verify_otp.html')
-
 
 #@shared_task
 def process_waitlist(bus):
