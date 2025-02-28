@@ -160,7 +160,7 @@ class Seat(models.Model):
 class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="bookings")
-    seats = models.ManyToManyField(Seat)
+    seats = models.ManyToManyField(Seat,blank=True,null=True)
     booking_time = models.DateTimeField(auto_now_add=True)
     start_stop = models.ForeignKey(RouteStop, on_delete=models.CASCADE, related_name="booking_start")
     end_stop = models.ForeignKey(RouteStop, on_delete=models.CASCADE, related_name="booking_end")

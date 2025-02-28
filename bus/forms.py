@@ -3,8 +3,8 @@ from . import models
 from datetime import datetime
 
 class BookingForm(forms.ModelForm):
-    seats_booked = forms.IntegerField(required=True, label="Number of seats: ")
-    seat_number = forms.CharField(max_length=100, required=False, label="Seat Number (optional): ")
+    seats_booked = forms.IntegerField(required=True, label="Number of seats: ",help_text="Enter the number of seats you want to book.")
+    seat_numbers = forms.CharField(max_length=100, required=False, label="Seat Number (optional): ")
     seat_class = forms.ModelChoiceField(queryset=models.Seatclass.objects.none(), required=True, label="Select seat class")
     start_stop = forms.ModelChoiceField(required=True, label="Select start stop",queryset=models.Stop.objects.none())
     end_stop = forms.ModelChoiceField(required=True, label="Select end stop",queryset=models.Stop.objects.none())
@@ -12,7 +12,7 @@ class BookingForm(forms.ModelForm):
 
     class Meta:
         model = models.Booking
-        fields = ['seats_booked', 'seat_class', 'seat_number','start_stop','end_stop']
+        fields = ['start_stop','end_stop']
 
     def __init__(self, *args, **kwargs):
         bus = kwargs.pop('bus', None)

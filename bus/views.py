@@ -217,8 +217,6 @@ def verif_bus_otp(request):
             booking=Booking.objects.create(
                 user=user,
                 bus=bus,
-                seat_class=selected_class,
-                seats_booked=seats_booked,
                 status='Confirmed',
                 start_stop=start_stop,
                 end_stop=end_stop,
