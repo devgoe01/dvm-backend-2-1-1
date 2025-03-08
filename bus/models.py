@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from datetime import timedelta,datetime
+from datetime import timedelta,datetime, timezone
 
 class User(AbstractUser):
     ROLE_CHOICES = (('passenger', 'Passenger'), ('admin', 'Administrator'))
@@ -58,12 +58,8 @@ class Bus(models.Model):
 
     def calculate_fare(self, start_stop, end_stop, seat_class_multiplier,num_seats):
         ordered_stops = self.route.get_ordered_stops()
-        stop_names = [route_stop.stop.name for route_stop in ordered_stops]
-        start_index = stop_names.index(start_stop.name)
-        end_index = stop_names.index(end_stop.name)
-
-        if start_index >= end_index:
-            raise ValueError("End stop must come after start stop.")
+        start_index = (start_stop.order)
+        end_index = (end_stop.order)
 
         total_duration = timedelta()
         for i in range(start_index, end_index):
@@ -160,7 +156,7 @@ class Seat(models.Model):
 class Booking(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="bookings")
-    seats = models.ManyToManyField(Seat,blank=True,null=True)
+    seats = models.ManyToManyField(Seat,blank=True)
     booking_time = models.DateTimeField(auto_now_add=True)
     start_stop = models.ForeignKey(RouteStop, on_delete=models.CASCADE, related_name="booking_start")
     end_stop = models.ForeignKey(RouteStop, on_delete=models.CASCADE, related_name="booking_end")
@@ -176,25 +172,7 @@ class Booking(models.Model):
         return self.seats.all()
 
 
-    def save(self, *args, **kwargs):
-        if not self.pk:
-            booked_seats = Booking.objects.filter(
-                bus=self.bus,
-                start_stop__order__lt=self.end_stop.order,
-                end_stop__order__gt=self.start_stop.order,
-                status='Confirmed'
-            ).values_list('seats__id', flat=True)
-            all_available_seats = self.bus.seats.exclude(id__in=booked_seats).filter(seat_class=self.seat_class)
-            specific_seat_numbers = kwargs.pop('seat_numbers', None)
-            if specific_seat_numbers:
-                selected_seats = all_available_seats.filter(seat_number__in=specific_seat_numbers)
-            else:
-                num_seats = kwargs.pop('num_seats')
-                selected_seats = list(all_available_seats)[:num_seats]
-            super().save(*args, **kwargs)
-            self.seats.set(selected_seats)
-        else:
-            super().save(*args, **kwargs)
+
 
 class Waitlist(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -222,12 +200,12 @@ class Otps(models.Model):
 
     def save(self, *args, **kwargs):
 #        if not self.expires_at:
-        self.expires_at = datetime.now().isoformat() + timedelta(minutes=2)
+        self.expires_at = datetime.now() + timedelta(minutes=2)
         self.created_at = datetime.now().isoformat()
         super().save(*args, **kwargs)
 
     def is_expired(self):
-        return datetime.now() > self.expires_at+timedelta(minutes=2)
+        return datetime.now(timezone.utc) > self.expires_at
 
     def can_resend(self):
         return self.otp_resend_attempts < self.max_resend_attempts
@@ -238,4 +216,4 @@ class Otps(models.Model):
         self.save()
 
     def __str__(self):
-        return f"OTP for {self.user.username} created at {self.created_at}"
+        return f"OTP for {self.email} created at {self.created_at.strftime('%Y-%m-%d %H:%M:%S')}"

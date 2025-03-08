@@ -17,20 +17,17 @@ class BookingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         bus = kwargs.pop('bus', None)
         super().__init__(*args, **kwargs)
-        self.fields['seat_class'].queryset = models.Seatclass.objects.filter(bus=bus)
-        if bus :
+        if bus and bus.route:
             self.fields['seat_class'].queryset = models.Seatclass.objects.filter(bus=bus)
-            if bus.route:
-                ordered_stops = bus.route.get_ordered_stops()
-                self.fields['start_stop'].choices = ordered_stops
-                self.fields['end_stop'].choices = ordered_stops
+            stop_choices = models.RouteStop.objects.filter(bus_route=bus.route).order_by('order')
+            self.fields['start_stop'].queryset = stop_choices
+            self.fields['end_stop'].queryset = stop_choices
 
     def clean(self):
         cleaned_data = super().clean()
         seats_booked = cleaned_data.get('seats_booked')
         start_stop = cleaned_data.get('start_stop')
         end_stop = cleaned_data.get('end_stop')
-
         if seats_booked <= 0:
             raise forms.ValidationError("Number of seats must be greater than 0.")
         if start_stop and end_stop:

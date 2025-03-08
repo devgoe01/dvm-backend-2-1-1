@@ -75,7 +75,9 @@ def book_bus(request, bus_number):
             seats_booked = form.cleaned_data['seats_booked']
             start_stop=form.cleaned_data['start_stop']
             end_stop=form.cleaned_data['end_stop']
-            seat_numbers_input = form.cleaned_data['seat_number']
+            try:
+                seat_numbers_input = form.cleaned_data['seat_number']
+            except: seat_numbers_input=None
             ''' stops=[bus.route.source]+bus.route.intermediate_stops+[bus.route.destination]'''
             ''' if start_stop not in stops or end_stop not in stops:
                 messages.error(request, "Invalid start stop or end stop")
@@ -111,32 +113,47 @@ def book_bus(request, bus_number):
                 return redirect('dashboard')'''
             
 
-
+            print(start_stop,end_stop,selected_class.fare_multiplier,seats_booked)
             total_cost=(bus.calculate_fare(start_stop,end_stop,selected_class.fare_multiplier,seats_booked))
 
             if user.wallet_balance >= Decimal(total_cost):
-                if Otps.objects.get(email=request.user.email).exists():
-                    otp_field= Otps.objects.filter(email=request.user.email).order_by('-created_at').first()
-                    if ((otp_field.created_at - now().isoformat()).total_seconds() <240) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [1,2]:
-                        resend_attempts=otp_field.otp_resend_attempts
-                    if ((otp_field.created_at - now().isoformat()).total_seconds() <600) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [3,4,5]:
-                        messages.error(request, "Wait for some time before requesting an otp again.")
-                        return redirect('dashboard')
-
-                if not resend_attempts:
-                    resend_attempts=0
+                try:
+                    if Otps.objects.get(email=request.user.email).exists():
+                        otp_field= Otps.objects.filter(email=request.user.email).order_by('-created_at').first()
+                        if ((otp_field.created_at - now().isoformat()).total_seconds() <240) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [1,2]:
+                            resend_attempts=otp_field.otp_resend_attempts
+                        if ((otp_field.created_at - now().isoformat()).total_seconds() <600) and otp_field.is_verified==False and otp_field.otp_resend_attempts in [3,4,5]:
+                            messages.error(request, "Wait for some time before requesting an otp again.")
+                            return redirect('dashboard')
+                except: pass    
+                try : resend_attempts 
+                except: resend_attempts=0
                 email_otp = utils.generate_otp()
-                
                 otp=Otps.objects.create(otp_code=email_otp,email=request.user.email,otp_resend_attempts=resend_attempts)
+                
+
+
+                booked_seats = Booking.objects.filter(
+                    bus=bus,
+                    start_stop__order__lt=end_stop.order,
+                    end_stop__order__gt=start_stop.order,
+                    status='Confirmed'
+                ).values_list('seats__id', flat=True)
+                all_available_seats =bus.seats.exclude(id__in=booked_seats).filter(seat_class=selected_class)
+                if seat_numbers_input:
+                    selected_seats = all_available_seats.filter(seat_number__in=seat_numbers_list)
+                else:
+                    selected_seats = list(all_available_seats)[:seats_booked]
+                print(selected_seats)
                 request.session['temp_booking'] = {
                     'otp_pk':otp.pk,
                     'bus_number': booking.bus.bus_number,
                     'seats_booked': seats_booked,
                     'otp': email_otp,
-                    'start_stop':start_stop,
-                    'end_stop':end_stop,
+                    'start_stop':start_stop.id,
+                    'end_stop':end_stop.id,
                     'total_cost':total_cost,
-                    'seat_numbers_list': seat_numbers_list if seat_numbers_input else None,
+                    'seat_numbers_list':[seat.id for seat in selected_seats],
 #                    'travel_date':booking.travel_date,
                 }
                 send_mail(
@@ -164,10 +181,15 @@ def verif_bus_otp(request):
         messages.error(request, "Please try again.")
         return redirect('dashboard')
     otp_resend_attempts = otp.otp_resend_attempts
-    last_resend_time = timezone.datetime.fromisoformat(otp.created_at)
+    last_resend_time = otp.created_at
     stored_otp = otp.otp_code
     otp_creation_time = now()
-
+    bus=Bus.objects.get(bus_number=temp_booking['bus_number'])
+    start_stop = Stop.objects.get(id=temp_booking['start_stop'])
+    end_stop = Stop.objects.get(id=temp_booking['end_stop'])
+    start_stop = Stop.objects.get(id=temp_booking['start_stop'])
+    start_stop = RouteStop.objects.get(bus_route=bus.route, stop=start_stop)
+    end_stop = RouteStop.objects.get(bus_route=bus.route, stop=end_stop)
     if request.method == "POST":
         entered_otp = request.POST.get('email_otp')
         if entered_otp.lower()=='resend':
@@ -199,14 +221,15 @@ def verif_bus_otp(request):
             user = request.user
             bus_number = temp_booking['bus_number']
             seats_booked = temp_booking['seats_booked']
-            selected_class_id = temp_booking['selected_class']
-            selected_class = Seatclass.objects.get(id=selected_class_id)
             start_stop=temp_booking['start_stop']
             end_stop=temp_booking['end_stop']
+            start_stop = RouteStop.objects.filter(bus_route=bus.route, stop__id=start_stop).first()
+            end_stop = RouteStop.objects.filter(bus_route=bus.route, stop__id=end_stop).first()
             total_cost=Decimal(temp_booking['total_cost'])
             seat_numbers_list = temp_booking['seat_numbers_list']
+            seat_numbers_list = Seat.objects.filter(id__in=seat_numbers_list)
 #            travel_date=temp_booking['travel_date']
-            if not all([bus_number, seats_booked, selected_class_id, start_stop, end_stop]):
+            if not all([bus_number, seats_booked, start_stop, end_stop,seat_numbers_list]):
                 messages.error(request, "Session data is incomplete. Please try booking again.")
                 return redirect('dashboard')
             bus=Bus.objects.get(bus_number=bus_number)
@@ -220,14 +243,14 @@ def verif_bus_otp(request):
                 status='Confirmed',
                 start_stop=start_stop,
                 end_stop=end_stop,
-                seat_numbers= seat_numbers_list if seat_numbers_list else None,
 #                travel_date=travel_date,
             )
+            booking.seats.set(seat_numbers_list)
             messages.success(request, "Your booking was successful!")
             try:
                 send_mail(
                     f'Booking Confirmation for Bus {bus_number}',
-                    f'Your booking for {seats_booked} seats in {selected_class.name} class is confirmed.\n from {start_stop} to {end_stop}.\nYour total cost is {total_cost:,.2f} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+                    f'Your booking for {seats_booked}.\n from {start_stop} to {end_stop}.\nYour total cost is {total_cost:,.2f} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
                     settings.EMAIL_HOST_USER,
                     [request.user.email],
                     fail_silently=False,
