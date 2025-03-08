@@ -228,6 +228,8 @@ def verif_bus_otp(request):
             total_cost=Decimal(temp_booking['total_cost'])
             seat_numbers_list = temp_booking['seat_numbers_list']
             seat_numbers_list = Seat.objects.filter(id__in=seat_numbers_list)
+            otp.is_verified=True
+            otp.save()
 #            travel_date=temp_booking['travel_date']
             if not all([bus_number, seats_booked, start_stop, end_stop,seat_numbers_list]):
                 messages.error(request, "Session data is incomplete. Please try booking again.")

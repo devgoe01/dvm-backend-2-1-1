@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from datetime import timedelta,datetime, timezone
+#from fernet_fields import EncryptedIntegerField
 
 class User(AbstractUser):
     ROLE_CHOICES = (('passenger', 'Passenger'), ('admin', 'Administrator'))
@@ -113,7 +114,7 @@ class Seatclass(models.Model):
         unique_together = ("bus", "name")
 
     def __str__(self):
-        return f"{self.bus.bus_number} - {self.name} {self.total_seats} available"
+        return f"{self.bus.bus_number} - {self.name} Total:{self.total_seats} "
 
 class Seat(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="seats")
@@ -191,6 +192,7 @@ class Waitlist(models.Model):
 
 class Otps(models.Model):
     otp_code = models.PositiveIntegerField()
+#    otp_code = models.EncyptedIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     otp_resend_attempts = models.PositiveIntegerField(default=0)
