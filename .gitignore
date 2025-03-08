@@ -4,6 +4,8 @@
 *.log
 *.pot
 *.pyc
+bus/modelsold.py
+bus/formsold.py
 __pycache__/
 */__pycache__/
 local_settings.py
