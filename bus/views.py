@@ -143,6 +143,10 @@ def book_bus(request, bus_number):
                     selected_seats = all_available_seats.filter(seat_number__in=[f"{selected_class.seat_class.name[:1]}-{num}" for num in seat_numbers_list])
                 else:
                     selected_seats = list(all_available_seats)[:seats_booked]
+                '''print(f"\n\n\n\n\n\n\n\n{all_available_seats}\n\n\n\n\n\n\n\n")
+                print(f"\n\n\n\n\n\n\n\n{selected_seats}\n\n\n\n\n\n\n\n")
+                print(f"\n\n\n\n\n\n\n\n{booked_seats}\n\n\n\n\n\n\n\n")
+                print(f"\n\n\n\n\n\n\n\n{seat_numbers_input}\n\n\n\n\n\n\n\n")'''
                 request.session['temp_booking'] = {
                     'otp_pk':otp.pk,
                     'bus_number': booking.bus.bus_number,
@@ -229,6 +233,7 @@ def verif_bus_otp(request):
             otp.is_verified=True
             otp.save()
 #            travel_date=temp_booking['travel_date']
+            '''print(bus_number, seats_booked, start_stop, end_stop,seat_numbers_list)'''
             if not all([bus_number, seats_booked, start_stop, end_stop,seat_numbers_list]):
                 messages.error(request, "Session data is incomplete. Please try booking again.")
                 return redirect('dashboard')

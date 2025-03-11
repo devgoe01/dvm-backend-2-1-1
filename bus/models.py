@@ -164,6 +164,10 @@ class Seat(models.Model):
         if seat_class:
             booked_seats_query = booked_seats_query.filter(seats__seat_class=seat_class) 
         booked_seat_numbers = booked_seats_query.values_list('seats__seat_number', flat=True)
+
+#        booked_seats_query.filter(seat_number__in=[f"{seat_class.seat_class.name[:1]}-{num}" for num in seat_numbers])
+        seat_numbers = [f"{seat_class.seat_class.name[:1]}-{num}" for num in seat_numbers]
+
         booked_seats_in_requested = set(seat_numbers).intersection(set(booked_seat_numbers))
         return bool(booked_seats_in_requested), list(booked_seats_in_requested)
 
