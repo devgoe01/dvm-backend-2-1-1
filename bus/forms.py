@@ -5,7 +5,7 @@ from datetime import datetime
 class BookingForm(forms.ModelForm):
     seats_booked = forms.IntegerField(required=True, label="Number of seats: ",help_text="Enter the number of seats you want to book.")
     seat_numbers = forms.CharField(max_length=100, required=False, label="Seat Number (optional): ")
-    seat_class = forms.ModelChoiceField(queryset=models.Seatclass.objects.none(), required=True, label="Select seat class")
+    seat_class = forms.ModelChoiceField(queryset=models.BusSeatClass.objects.none(), required=True, label="Select seat class")
     start_stop = forms.ModelChoiceField(required=True, label="Select start stop",queryset=models.Stop.objects.none())
     end_stop = forms.ModelChoiceField(required=True, label="Select end stop",queryset=models.Stop.objects.none())
 #    travel_date = forms.DateField(required=True, label="Travel Date")
@@ -18,7 +18,7 @@ class BookingForm(forms.ModelForm):
         bus = kwargs.pop('bus', None)
         super().__init__(*args, **kwargs)
         if bus and bus.route:
-            self.fields['seat_class'].queryset = models.Seatclass.objects.filter(bus=bus)
+            self.fields['seat_class'].queryset = models.BusSeatClass.objects.filter(bus=bus)
             stop_choices = models.RouteStop.objects.filter(bus_route=bus.route).order_by('order')
             self.fields['start_stop'].queryset = stop_choices
             self.fields['end_stop'].queryset = stop_choices
@@ -111,8 +111,12 @@ class AddStopForm(forms.ModelForm):
 
 class SeatClassForm(forms.ModelForm):
     class Meta:
-        model = models.Seatclass
-        fields = ['name', 'total_seats', 'fare_multiplier']
+        model = models.BusSeatClass
+        fields = ['seat_class', 'total_seats', 'fare_multiplier']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['seat_class'].queryset = models.Seatclass.objects.all()
 
     def clean(self):
         cleaned_data = super().clean()
@@ -120,6 +124,8 @@ class SeatClassForm(forms.ModelForm):
         if total_seats <= 0:
             raise forms.ValidationError("Total seats must be greater than 0.")
         return cleaned_data
+
+
 '''
 class EditBookingForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
@@ -137,6 +143,8 @@ class EditBookingForm(forms.ModelForm):
         cleaned_data = super().clean()
         return cleaned_data
 '''
+
+
 class EditBookingForm(forms.ModelForm):
     pass
 class EditBusForm(forms.ModelForm):
@@ -146,3 +154,9 @@ class EditBusForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         return cleaned_data
+    
+
+class AddClassForm(forms.ModelForm):
+    class Meta:
+        model = models.Seatclass
+        fields = ['name']

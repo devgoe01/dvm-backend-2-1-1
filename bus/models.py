@@ -35,6 +35,13 @@ class BusRoute(models.Model):
     
     def get_stops_names(self):
         return [route_stop.stop.name for route_stop in self.get_ordered_stops()]
+    
+    def get_total_route_duration(self):
+        total_duration = timedelta()
+        for route_stop in self.get_ordered_stops():
+            if route_stop.duration_to_next_stop:
+                total_duration += route_stop.duration_to_next_stop
+        return total_duration
 
 
 class RouteStop(models.Model):
@@ -56,6 +63,7 @@ class Bus(models.Model):
     route = models.ForeignKey(BusRoute, on_delete=models.CASCADE, related_name="buses")
     departure_time = models.DateTimeField()
     base_fare_per_hour = models.DecimalField(max_digits=6, decimal_places=2)
+    seat_classes = models.ManyToManyField('Seatclass', through='BusSeatClass', related_name='buses')
 
     def calculate_fare(self, start_stop, end_stop, seat_class_multiplier,num_seats):
         ordered_stops = self.route.get_ordered_stops()
@@ -87,9 +95,9 @@ class Bus(models.Model):
         return self.seats.filter(id__in=available_seats_ids)
 
     def initialize_seats(self):
-        for seat_class in self.seat_classes.all():
+        for seat_class in BusSeatClass.objects.filter(bus=self):
             for i in range(1,seat_class.total_seats+1):
-                Seat.objects.get_or_create(bus=self, seat_number=f"{seat_class.name[:1]}-{i}",seat_class=seat_class)
+                Seat.objects.get_or_create(bus=self, seat_number=f"{seat_class.seat_class.name[:1]}-{i}",seat_class=seat_class)
 
     def are_seats_available(self,num_seats,start_stop,end_stop,seat_class):
         all_seats_in_class=self.seats.filter(seat_class=seat_class).values_list('id',flat=True)
@@ -110,30 +118,30 @@ class Seatclass(models.Model):
     def __str__(self):
         return f"{self.name} "
 
-
 class BusSeatClass(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
     seat_class = models.ForeignKey(Seatclass, on_delete=models.CASCADE,related_name="bus_seat_classes")
     total_seats = models.PositiveIntegerField()
+    fare_multiplier = models.DecimalField(max_digits=4, decimal_places=2,default=1.0)
     class Meta:
         unique_together = ("bus", "seat_class")
-    def __str__(self):
-        return f"{self.bus} - {self.seat_class.name} (Total Seats:{self.total_seats} )"
 
+    def __str__(self):
+        return f"{self.bus} - {self.seat_class.name} (Total Seats:{self.total_seats} ),(Fare Multiplier:{self.fare_multiplier})"
 
 
 class Seat(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="seats")
     seat_number = models.CharField(max_length=10)
-    seat_class=models.ForeignKey(Seatclass,on_delete=models.CASCADE)
+    seat_class=models.ForeignKey(BusSeatClass,on_delete=models.CASCADE)
     class Meta:
         unique_together = ("bus", "seat_number")
 
     def __str__(self):
-        return f"Seat {self.seat_number} {self.seat_class.name} on Bus {self.bus.bus_number}"
+        return f"Seat {self.seat_number} {self.seat_class.seat_class.name} on Bus {self.bus.bus_number}"
 
     def get_seat_class(self):
-        return self.seat_class.name
+        return self.seat_class.seat_class.name
 
     def is_booked(self, start_stop, end_stop):
         overlapping_bookings = Booking.objects.filter(
@@ -184,7 +192,7 @@ class Booking(models.Model):
 class Waitlist(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
-    seat_class = models.ForeignKey(Seatclass, on_delete=models.CASCADE)
+    seat_class = models.ForeignKey(BusSeatClass, on_delete=models.CASCADE)
     seats_requested = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(
