@@ -216,7 +216,7 @@ def verif_bus_otp(request):
             )
             messages.success(request, "A new OTP has been sent to your email.")
             return redirect('verif_bus_otp')
-        if (1>0 or utils.verify_otp(otp.otp_code, stored_otp)):
+        if (utils.verify_otp(otp.otp_code, stored_otp)):
             if otp.is_expired():
                 messages.error(request, "OTP has expired. Please request a new one.")
                 return redirect('verif_bus_otp')
