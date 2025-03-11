@@ -15,13 +15,14 @@ media/*
 bus/oldmodels.py
 datadump.json
 ../vscode/
-models.py
+/models.py
 !media/default.jpg
 models.txt
 *.py[cod]
 *$py.class
 bus/templates/bus/add_bus copy.html
 *.so
+bus/models copy.py
 .Python
 build/
 develop-eggs/
