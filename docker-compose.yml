@@ -18,7 +18,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: hphphphp
-      POSTGRES_DB: Django_Bus_WebApplication_dev
+      POSTGRES_DB: Django_Bus_WebApplication
 
 volumes:
   postgres_data:

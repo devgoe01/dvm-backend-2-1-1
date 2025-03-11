@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from .models import User, Bus, Booking, Seatclass,Waitlist,Otps,Seat,RouteStop,Stop,BusRoute
 from django.contrib import messages
-from .forms import SearchForm, BookingForm,AddRouteForm, EditBookingForm, EditBusForm, AddBusForm,SeatClassForm
+from .forms import SearchForm, BookingForm,AddRouteForm, EditBookingForm, EditBusForm, AddBusForm,SeatClassForm,AddStopForm
 from django.utils.timezone import now
 from django.db.models import Sum
 from django.core.mail import send_mail
@@ -113,7 +113,6 @@ def book_bus(request, bus_number):
                 return redirect('dashboard')'''
             
 
-            print(start_stop,end_stop,selected_class.fare_multiplier,seats_booked)
             total_cost=(bus.calculate_fare(start_stop,end_stop,selected_class.fare_multiplier,seats_booked))
 
             if user.wallet_balance >= Decimal(total_cost):
@@ -429,6 +428,27 @@ def add_route(request):
     else:
         route_form = AddRouteForm()
     return render(request, 'bus/add_route.html', {'route_form': route_form})
+
+
+
+@login_required
+def add_stop(request):
+    if not request.user.is_admin():
+        messages.error(request, "You do not have permission to add stops.")
+        return redirect('dashboard')
+    if request.method == "POST":
+        stop_form = AddStopForm(request.POST)
+        if stop_form.is_valid():
+            stop_form.save()
+            messages.success(request, "Stop added successfully!")
+            return redirect('add_route')
+        else:
+            messages.error(request, "Please correct the errors in the form.")
+    else:
+        stop_form = AddStopForm()
+    return render(request, 'bus/add_stop.html', {'stop_form': stop_form})
+
+
 
 @login_required
 def add_bus(request):

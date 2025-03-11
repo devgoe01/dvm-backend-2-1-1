@@ -15,6 +15,7 @@ media/*
 bus/oldmodels.py
 datadump.json
 ../vscode/
+models.py
 !media/default.jpg
 models.txt
 *.py[cod]

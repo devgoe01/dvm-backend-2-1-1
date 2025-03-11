@@ -101,6 +101,14 @@ class AddBusForm(forms.ModelForm):
 #            raise forms.ValidationError("Operating days must be a list of valid days (e.g., ['Monday', 'Wednesday']).")
         return cleaned_data
 
+
+class AddStopForm(forms.ModelForm):
+    class Meta:
+        model = models.Stop
+        fields = ['name']
+    def clean(self):
+        return super().clean()
+
 class SeatClassForm(forms.ModelForm):
     class Meta:
         model = models.Seatclass

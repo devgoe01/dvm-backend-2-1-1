@@ -186,6 +186,8 @@ class Waitlist(models.Model):
         choices=[('Pending', 'Pending'), ('Fulfilled', 'Fulfilled')],
         default='Pending'
     )
+    start_stop=models.ForeignKey(RouteStop,on_delete=models.CASCADE,related_name="waitlist_start")
+    end_stop=models.ForeignKey(RouteStop,on_delete=models.CASCADE,related_name="waitlist_end")
 
     def __str__(self):
         return f"Waitlist Entry: {self.user.username} for Bus {self.bus.bus_number} class {self.seat_class.name}"
