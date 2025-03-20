@@ -9,10 +9,10 @@
       <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
       <p><strong>Route:</strong> {{ bus.route }}</p>
       <p><strong>Departure Time:</strong> {{ bus.departure_time }}</p>
-      <p><strong>Fare: </strong>{{ bus.base_fare_per_hour }}</p>
-      {% for seat_class in bus.seat_classes.all %}
+      <p><strong>Base Fare per hour: </strong>{{ bus.base_fare_per_hour }}</p>
+<!--      {% for seat_class in bus.seat_classes.all %}
             <p><strong>{{ seat_class.name }} Seats:</strong> {{ seat_class.seats_available }}</p>
-      {% endfor %}
+      {% endfor %} -->
       {{ form|crispy }}
   </fieldset>
   <div class="form-group">

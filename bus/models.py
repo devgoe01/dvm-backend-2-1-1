@@ -1,8 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from datetime import timedelta,datetime, timezone
+from datetime import timedelta, datetime, timezone
+from django.utils.timezone import make_aware
 #from fernet_fields import EncryptedIntegerField
+from multiselectfield import MultiSelectField
+
 
 class User(AbstractUser):
     ROLE_CHOICES = (('passenger', 'Passenger'), ('admin', 'Administrator'))
@@ -17,11 +20,13 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == 'admin'
 
+
 class Stop(models.Model):
     name = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.name
+
 
 class BusRoute(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -56,14 +61,17 @@ class RouteStop(models.Model):
     
     def __str__(self):
         return f"{self.bus_route.name} - {self.stop.name} (Order: {self.order})"
-
+ 
 
 class Bus(models.Model):
     bus_number = models.AutoField(primary_key=True)
     route = models.ForeignKey(BusRoute, on_delete=models.CASCADE, related_name="buses")
-    departure_time = models.DateTimeField()
+    departure_time=models.DateTimeField()
     base_fare_per_hour = models.DecimalField(max_digits=6, decimal_places=2)
     seat_classes = models.ManyToManyField('Seatclass', through='BusSeatClass', related_name='buses')
+    Days_of_week = (('Monday', 'Monday'), ('Tuesday', 'Tuesday'), ('Wednesday', 'Wednesday'), ('Thursday', 'Thursday'), ('Friday', 'Friday'), ('Saturday', 'Saturday'), ('Sunday', 'Sunday'))
+    days_of_week_running = MultiSelectField(choices=Days_of_week,default='Monday')
+
 
     def calculate_fare(self, start_stop, end_stop, seat_class_multiplier,num_seats):
         ordered_stops = self.route.get_ordered_stops()
@@ -79,44 +87,42 @@ class Bus(models.Model):
 
     def __str__(self):
         return f"Bus {self.bus_number} on Route {self.route.name}"
-    
 
-    def get_all_available_seats(self, start_stop, end_stop,seat_class=None):
-        all_seats = self.seats.values_list('id', flat=True)
-        booked_seats = Booking.objects.filter(
-            bus=self,
-            start_stop__order__lt=end_stop.order,
-            end_stop__order__gt=start_stop.order,
-            status='Confirmed'
-        ).values_list('seats__id', flat=True)
-        available_seats_ids = set(all_seats) - set(booked_seats)
-        if seat_class:
-            return self.seats.filter(id__in=available_seats_ids, seat_class=seat_class)
-        return self.seats.filter(id__in=available_seats_ids)
+    def initialize_bus_instances(self):
+        today=datetime.now().date()
+        for bus in Bus.objects.all():
+            running_days=bus.days_of_week_running
+            
+            for i in range(15):
+                current_date=today+timedelta(days=i)
+                current_day_name = current_date.strftime('%A')
+                if current_day_name in running_days:
+                    departure_datetime = make_aware(datetime.combine(current_date, bus.departure_time.time()))
+                    if not BusInstance.objects.filter(bus=bus, departure_time=departure_datetime).exists():
+                        BusInstance.objects.create(bus=bus, departure_time=departure_datetime)
+
+    def last_initialize_bus_instances(self):
+        today=datetime.now().date()
+        for bus in Bus.objects.all():
+            running_days=bus.days_of_week_running
+            current_date=today+timedelta(days=15)
+            if current_date.strftime('%A') in running_days:
+                departure_datetime = make_aware(datetime.combine(current_date, bus.departure_time.time()))
+                if not BusInstance.objects.filter(bus=bus, departure_time=departure_datetime).exists():
+                    BusInstance.objects.create(bus=bus, departure_time=departure_datetime)
 
     def initialize_seats(self):
         for seat_class in BusSeatClass.objects.filter(bus=self):
             for i in range(1,seat_class.total_seats+1):
                 Seat.objects.get_or_create(bus=self, seat_number=f"{seat_class.seat_class.name[:1]}-{i}",seat_class=seat_class)
 
-    def are_seats_available(self,num_seats,start_stop,end_stop,seat_class):
-        all_seats_in_class=self.seats.filter(seat_class=seat_class).values_list('id',flat=True)
-        booked_seats = Booking.objects.filter(
-            bus=self,
-            seats__seat_class=seat_class,
-            start_stop__order__lt=end_stop.order,
-            end_stop__order__gt=start_stop.order,
-            status='Confirmed'
-        ).values_list('seats__id', flat=True)
-        available_seats = set(all_seats_in_class) - set(booked_seats)
-        
-        return len(available_seats) >= num_seats
 
 class Seatclass(models.Model):
     name = models.CharField(max_length=50)
 
     def __str__(self):
         return f"{self.name} "
+
 
 class BusSeatClass(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
@@ -143,20 +149,20 @@ class Seat(models.Model):
     def get_seat_class(self):
         return self.seat_class.seat_class.name
 
-    def is_booked(self, start_stop, end_stop):
+    def is_booked(self, bus_instance,start_stop, end_stop):
         overlapping_bookings = Booking.objects.filter(
             seats=self,
             start_stop__order__lt=end_stop.order,
             end_stop__order__gt=start_stop.order,
-            bus=self.bus,
+            bus=bus_instance,
             status='Confirmed'
         )
         return overlapping_bookings.exists()
 
     @staticmethod
-    def are_seats_booked(bus, seat_numbers, start_stop, end_stop, seat_class=None):
+    def are_seats_booked(bus_instance, seat_numbers, start_stop, end_stop, seat_class=None):
         booked_seats_query = Booking.objects.filter(
-            bus=bus,
+            bus=bus_instance,
             start_stop__order__lt=end_stop.order,
             end_stop__order__gt=start_stop.order,
             status='Confirmed'
@@ -173,8 +179,9 @@ class Seat(models.Model):
 
 
 class Booking(models.Model):
+    # Foreign key is written in many side of the relationship
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name="bookings")
+    bus = models.ForeignKey("BusInstance", on_delete=models.CASCADE, related_name="bookings")
     seats = models.ManyToManyField(Seat,blank=True)
     booking_time = models.DateTimeField(auto_now_add=True)
     start_stop = models.ForeignKey(RouteStop, on_delete=models.CASCADE, related_name="booking_start")
@@ -189,13 +196,14 @@ class Booking(models.Model):
         return f"Booking {self.id} by {self.user.username}"
     def get_booked_seats(self):
         return self.seats.all()
-
-
+    
+    def booking_calculate_fare(self):
+        return self.bus.bus.calculate_fare(self.start_stop, self.end_stop, self.seats.first().seat_class.fare_multiplier,len(self.seats.all()))
 
 
 class Waitlist(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    bus = models.ForeignKey(Bus, on_delete=models.CASCADE)
+    bus = models.ForeignKey("BusInstance", on_delete=models.CASCADE)
     seat_class = models.ForeignKey(BusSeatClass, on_delete=models.CASCADE)
     seats_requested = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -208,7 +216,8 @@ class Waitlist(models.Model):
     end_stop=models.ForeignKey(RouteStop,on_delete=models.CASCADE,related_name="waitlist_end")
 
     def __str__(self):
-        return f"Waitlist Entry: {self.user.username} for Bus {self.bus.bus_number} class {self.seat_class.name}"
+        return f"Waitlist Entry: {self.user.username} for Bus {self.bus.bus.bus_number} class {self.seat_class.name}"
+
 
 class Otps(models.Model):
     otp_code = models.PositiveIntegerField()
@@ -239,3 +248,39 @@ class Otps(models.Model):
 
     def __str__(self):
         return f"OTP for {self.email} created at {self.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+class BusInstance(models.Model):
+    bus=models.ForeignKey(Bus,on_delete=models.CASCADE,related_name="bus_instances")
+    departure_time=models.DateTimeField()
+
+    def __str__(self):
+        return f"Bus {self.bus.bus_number} Instance at {self.departure_time}"
+    
+
+    def get_all_available_seats(self, start_stop, end_stop,seat_class=None):
+        all_seats = self.seats.values_list('id', flat=True)
+        booked_seats = Booking.objects.filter(
+            bus=self,
+            start_stop__order__lt=end_stop.order,
+            end_stop__order__gt=start_stop.order,
+            status='Confirmed'
+        ).values_list('seats__id', flat=True)
+        available_seats_ids = set(all_seats) - set(booked_seats)
+        if seat_class:
+            return self.seats.filter(id__in=available_seats_ids, seat_class=seat_class)
+        return self.seats.filter(id__in=available_seats_ids)
+
+   
+
+    def are_seats_available(self,num_seats,start_stop,end_stop,seat_class):
+        all_seats_in_class=self.bus.seats.filter(seat_class=seat_class).values_list('id',flat=True)
+        booked_seats = Booking.objects.filter(
+            bus=self,
+            seats__seat_class=seat_class,
+            start_stop__order__lt=end_stop.order,
+            end_stop__order__gt=start_stop.order,
+            status='Confirmed'
+        ).values_list('seats__id', flat=True)
+        available_seats = set(all_seats_in_class) - set(booked_seats)
+        return len(available_seats) >= num_seats

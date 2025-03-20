@@ -1,0 +1,13 @@
+{% extends "bus/base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+<h1>Add a New Route</h1>
+<form method="POST">
+  {% csrf_token %}
+  <fieldset>
+    <legend>Seat Class Name</legend>
+    {{ seat_class_form|crispy }}
+  </fieldset>
+  <button type="submit" class="btn btn-primary">Add Seat Class</button>
+</form>
+{% endblock %}

@@ -21,8 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Expose port 8000 for Gunicorn
-EXPOSE 8000
+# Expose port 1337 for Gunicorn
+EXPOSE 1337
 
 # Run Gunicorn server
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "bus_service.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:1337", "bus_service.wsgi:application"]

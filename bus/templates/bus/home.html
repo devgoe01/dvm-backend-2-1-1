@@ -7,7 +7,7 @@
 
 <form method="GET">
   {{ form|crispy }}
-<!--
+  <!--
   <label for="travel_date">Travel Date:</label>
   <input type="date" id="travel_date" name="travel_date" required>-->
   <button type="submit" class="btn btn-primary">Search</button>
@@ -15,20 +15,60 @@
 
 <hr>
 <h1>Search Results</h1>
-{% for bus in buses %}
-  <div>
-    <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
-    <p><strong>Route:</strong> {{ bus.route.source }} {% if bus.route.intermediate_stops %} to {{bus.route.intermediate_stops}} {% endif %} to {{ bus.route.destination }}</p>
-    <p><strong>Departure:</strong> {{ bus.departure_time }}</p>
-
-      <p><strong>Class:</strong> {% for seat_class in bus.seat_classes.all %}{{ seat_class.name }} {% endfor %}</p>
-      <p><strong>Fare per hour:</strong>{% for seat_class in bus.seat_classes.all %} {{ bus.base_fare_per_hour|floatformat:0 }}*{{ seat_class.fare_multiplier|floatformat:0 }} {% endfor %}</p>
-      <p><strong>Available Seats:</strong>{% for seat_class in bus.seat_classes.all %} {{ seat_class.seats_available }}/{{ seat_class.total_seats }} {% endfor %}</p>
-
-    <a href="{% url 'book_bus' bus.bus_number %}">Book Now</a>
-    <hr>
-  </div>
-{% empty %}
-  <p><strong>No buses found for this route.</p>
-{% endfor %}
+{% if buses %}
+  {% for bus in buses %}
+    <div>
+      <p><strong>Bus:</strong> {{ bus.bus_number }}</p>
+      <p><strong>Route:</strong> {{ bus.route.name }}</p>
+      <p>
+        {% for stop in bus.route.get_ordered_stops %}
+          {{ stop.stop.name }}{% if not forloop.last %} → {% endif %}
+        {% endfor %}
+      </p>
+      <p><strong>Departure:</strong> {{ bus.departure_time|time:"H:i" }}</p>
+      <p><strong>Class:</strong> 
+        {% for seat_class in bus.seat_classes.all %}{{ seat_class.name }} {% endfor %}
+      </p>
+      <p><strong>Fare per hour:</strong>
+        {% for seat_class in bus.busseatclass_set.all %} {{ bus.base_fare_per_hour|floatformat:0 }} x {{ seat_class.fare_multiplier|floatformat:0 }} {% endfor %}
+      </p>
+      <p><strong>Total Seats:</strong>
+        {% for seat_class in bus.busseatclass_set.all %}
+          {{ seat_class.total_seats }} 
+        {% endfor %}
+      </p>
+      <p><strong>Days running:</strong> {{ bus.days_of_week_running }}</p>
+      <a href="{% url 'book_bus' bus.bus_number %}">Book Now</a>
+      <hr>
+    </div>
+  {% endfor %}
+{% elif bus_instances %}
+  {% for bus in bus_instances %}
+    <div>
+      <p><strong>Bus:</strong> {{ bus.bus.bus_number }}</p>
+      <p><strong>Route:</strong> {{ bus.bus.route.name }}</p>
+      <p>
+        {% for stop in bus.bus.route.get_ordered_stops %}
+          {{ stop.stop.name }}{% if not forloop.last %} → {% endif %}
+        {% endfor %}
+      </p>
+      <p><strong>Departure:</strong> {{ bus.bus.departure_time }}</p>
+      <p><strong>Class:</strong> 
+        {% for seat_class in bus.bus.seat_classes.all %}{{ seat_class.name }} {% endfor %}
+      </p>
+      <p><strong>Fare per hour:</strong>
+        {% for seat_class in bus.bus.busseatclass_set.all %} {{ bus.bus.base_fare_per_hour|floatformat:0 }} x {{ seat_class.fare_multiplier|floatformat:0 }} {% endfor %}
+      </p>
+      <p><strong>Total Seats:</strong>
+        {% for seat_class in bus.bus.busseatclass_set.all %}
+          {{ seat_class.total_seats }} 
+        {% endfor %}
+      </p>
+      <a href="{% url 'book_bus' bus.bus.bus_number %}">Book Now</a>
+    </div>
+  {% endfor %}
+{% else %}
+  <p>No buses found for this route.</p>
+{% endif %}
 {% endblock content %}
+{# {{ instance.get_all_available_seats(instance.bus.route.get_ordered_stops|first, instance.bus.route.get_ordered_stops|last, seat_class) }} #}

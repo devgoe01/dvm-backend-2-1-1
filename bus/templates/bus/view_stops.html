@@ -1,0 +1,12 @@
+{% extends "bus/base.html" %}
+
+{% block content %}
+<h1>Buses you can edit: </h1>
+{% for s in stops %}
+    <div>
+        <p><strong>Name:</strong> {{ s.name }}</p>
+        <hr>
+    </div>
+{% endfor %}
+<a href="{% url 'add_stop' %}" class="btn btn-primary">Add Stop</a>
+{% endblock content %}

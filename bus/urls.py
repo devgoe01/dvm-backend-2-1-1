@@ -24,6 +24,8 @@ urlpatterns = [
     path('add-route/', views.add_route, name='add_route'),
     path('add-stop/', views.add_stop, name='add_stop'),
     path('add-class/', views.add_class, name='add_class'),
+    path('stops/',views.view_stops, name='view_stops'),
+    path('add-seatclass/', views.add_seat_class, name='add_seat_class'),
 ]
 
 
