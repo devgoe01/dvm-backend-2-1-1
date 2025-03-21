@@ -15,12 +15,6 @@ services:
       - db
   db:
     image: postgres:15-alpine
-    environment:
-      CSRF_TRUSTED_ORIGINS: localhost 127.0.0.1
-      POSTGRES_DB: Django_Bus_WebApplication_prod
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: hphphphp
-      
 #      POSTGRES_DB: Django_Bus_WebApplication_prod
 #      POSTGRES_USER: postgres
 #      POSTGRES_PASSWORD: hphphphp

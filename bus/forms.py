@@ -72,8 +72,7 @@ class SearchForm(forms.Form):
                 raise forms.ValidationError("Travel date must be in the future.")
             if not models.BusInstance.objects.filter(departure_time__date=travel_date).exists():
                 raise forms.ValidationError("No buses available on the selected date.")
-
-        if (not source or not destination) and not cleaned_data.get('see_all_buses'):
+        if not ( source or destination or travel_date or self.cleaned_data['see_all_buses']):
             raise forms.ValidationError("Please enter either source or destination.")
         
         return cleaned_data

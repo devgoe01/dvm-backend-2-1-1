@@ -25,6 +25,21 @@ def dashboard(request):
     else:
         return render(request, 'bus/passenger_dashboard.html')
 
+
+
+def search_func(travel_date,valid_routes,sort_by_departure):
+    if travel_date:
+        day_of_week = travel_date.strftime("%A")
+        bus_instances=BusInstance.objects.filter(departure_time__date=travel_date,bus__days_of_week_running__contains=day_of_week)
+        bus_instances = bus_instances.filter(bus__route__in=valid_routes).annotate(total_seats_available=Sum('bus__busseatclass__total_seats')).order_by('departure_time' if sort_by_departure else '-total_seats_available')
+        #print(f"\n\n\n\n\n\n\n\n{bus_instances}\n\n\n\n\n\n\n\n")
+        return None,bus_instances
+    else:
+        buses = Bus.objects.filter(route__in=valid_routes).annotate(total_seats_available=Sum('busseatclass__total_seats')).order_by('departure_time' if sort_by_departure else '-total_seats_available')
+        #print(f"\n\n\n\n\n\n\n\n{buses}\n\n\n\n\n\n\n\n")
+        return buses,None
+
+
 def home(request):
     initializer()
     #buses = Bus.objects.select_related('route').prefetch_related('route__stops', 'seat_classes')
@@ -39,33 +54,87 @@ def home(request):
             sort_by_departure = form.cleaned_data['sort_by_departure']
             travel_date = form.cleaned_data.get('travel_date', None)
             if form.cleaned_data['see_all_buses']:
-                buses = Bus.objects.annotate(
-                    total_seats_available=Sum('seat_classes__total_seats')
-                ).order_by('departure_time' if sort_by_departure else '-total_seats_available')
+                buses=Bus.objects.select_related('route').prefetch_related('route__stops', 'seat_classes')
+                bus_instances=None
+
+                try :del request.session['search_data']
+                except:pass
+                return render(request, 'bus/home.html', {'form': form, 'buses': buses,'bus_instances':bus_instances})
+
+
+            if source and not destination:
+                valid_routes=[]
+                source_stops=RouteStop.objects.filter(stop=source)
+                #print(f"\n\n\n\n\n\n\n\n{source_stops}\n\n\n\n\n\n\n\n")
+                for source_stop in source_stops:
+                    if source_stop.order==source_stop.bus_route.routestop_set.last().order:
+                        continue
+                    valid_routes.append(source_stop.bus_route)
+                #print(f"\n\n\n\n\n\n\n\n{valid_routes}\n\n\n\n\n\n\n\n")
+                
+                buses, bus_instances = search_func(travel_date,valid_routes,sort_by_departure)
+                try :del request.session['search_data']
+                except:pass
+                request.session['search_data'] = json.dumps({
+                    'source': source.id if source else None,
+                    'destination': destination.id if destination else None,
+                    'travel_date': str(travel_date) if travel_date else None
+                })
+                return render(request, 'bus/home.html', {'form': form, 'buses': buses,'bus_instances':bus_instances})
+            
+
+            if not source and destination:
+                valid_routes=[]
+                destination_stops=RouteStop.objects.filter(stop=destination)
+                for destination_stop in destination_stops:
+                    if destination_stop.order==destination_stop.bus_route.routestop_set.first().order:
+                        continue
+                    valid_routes.append(destination_stop.bus_route)
+                
+                buses, bus_instances = search_func(travel_date,valid_routes,sort_by_departure)
+                try :del request.session['search_data']
+                except:pass
+                request.session['search_data'] = json.dumps({
+                    'source': source.id if source else None,
+                    'destination': destination.id if destination else None,
+                    'travel_date': str(travel_date) if travel_date else None
+                })
                 return render(request, 'bus/home.html', {'form': form, 'buses': buses,'bus_instances':bus_instances})
 
             source_stops = RouteStop.objects.filter(stop=source)
             destination_stops = RouteStop.objects.filter(stop=destination)
             valid_routes = []
             for source_stop in source_stops:
-                    destination_stop = destination_stops.filter(
-                        bus_route=source_stop.bus_route, 
-                        order__gt=source_stop.order
-                        ).first()
-                    if destination_stop:
-                        valid_routes.append(source_stop.bus_route)
+                destination_stop = destination_stops.filter(
+                    bus_route=source_stop.bus_route, 
+                    order__gt=source_stop.order
+                    ).first()
+                if destination_stop:
+                    valid_routes.append(source_stop.bus_route)
+            
 
-            if not travel_date:
+            if travel_date and not source:
+                bus_instances=BusInstance.objects.filter(departure_time__date=travel_date).annotate(total_seats_available=Sum('bus__busseatclass__total_seats')).order_by('departure_time' if sort_by_departure else '-total_seats_available')
+                try :del request.session['search_data']
+                except:pass
+                request.session['search_data'] = json.dumps({
+                    'source': source.id if source else None,
+                    'destination': destination.id if destination else None,
+                    'travel_date': str(travel_date) if travel_date else None
+                })
+                return render(request, 'bus/home.html', {'form': form, 'buses': buses,'bus_instances':bus_instances})
+            if not travel_date :
                 buses = Bus.objects.filter(route__in=valid_routes).annotate(total_seats_available=Sum('busseatclass__total_seats')).order_by('departure_time' if sort_by_departure else '-total_seats_available')
             else:
                 day_of_week = travel_date.strftime("%A")
                 bus_instances=BusInstance.objects.filter(departure_time__date=travel_date,bus__days_of_week_running__contains=day_of_week)
                 bus_instances = bus_instances.filter(bus__route__in=valid_routes).annotate(total_seats_available=Sum('bus__busseatclass__total_seats')).order_by('departure_time' if sort_by_departure else '-total_seats_available')
             
-            del request.session['search_data']
+            try :del request.session['search_data']
+            except:pass
             request.session['search_data'] = json.dumps({
-                'source': source.id,
-                'destination': destination.id,
+                'source': source.id if source else None,
+                'destination': destination.id if destination else None,
                 'travel_date': str(travel_date) if travel_date else None
             })
     else:
@@ -104,7 +173,7 @@ def book_bus(request, bus_number):
             if not bus.are_seats_available(seats_booked,start_stop,end_stop,selected_class):
                 messages.error(request, "Seats are not available")
                 return redirect('book_bus', bus_number=bus_number)
-            
+        
             if seat_numbers_input:
                 seat_numbers_list = [s.strip() for s in seat_numbers_input.split(',')]
                 if len(seat_numbers_list) != seats_booked:

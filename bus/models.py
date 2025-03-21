@@ -70,7 +70,7 @@ class Bus(models.Model):
     base_fare_per_hour = models.DecimalField(max_digits=6, decimal_places=2)
     seat_classes = models.ManyToManyField('Seatclass', through='BusSeatClass', related_name='buses')
     Days_of_week = (('Monday', 'Monday'), ('Tuesday', 'Tuesday'), ('Wednesday', 'Wednesday'), ('Thursday', 'Thursday'), ('Friday', 'Friday'), ('Saturday', 'Saturday'), ('Sunday', 'Sunday'))
-    days_of_week_running = MultiSelectField(choices=Days_of_week,default='Monday')
+    days_of_week_running = MultiSelectField(choices=Days_of_week,default='Monday',max_length=150)
 
 
     def calculate_fare(self, start_stop, end_stop, seat_class_multiplier,num_seats):

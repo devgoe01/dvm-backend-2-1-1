@@ -11,7 +11,7 @@ def pack_seat_classes(general, sleeper, luxury):
 #    bus.save()
     return f"{general}-{sleeper}-{luxury}"
 '''
-def unpack_available_seats_classes(bus_number):
+'''def unpack_available_seats_classes(bus_number):
     available_seats = Bus.objects.get(bus_number=bus_number).available_seats
     general, sleeper, luxury = map(int, available_seats.split('-'))
     return {'General': general,'general':general,'sleeper':sleeper,'luxury':luxury, 'Sleeper': sleeper, 'Luxury': luxury}
@@ -48,4 +48,4 @@ def pack_booked_seats(class_,num):
         general=0
         sleeper=0
         luxury=num
-    return f"{general}-{sleeper}-{luxury}"
+    return f"{general}-{sleeper}-{luxury}"'''
