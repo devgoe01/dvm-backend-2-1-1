@@ -6,7 +6,7 @@ services:
     command: gunicorn bus_service.wsgi:application --bind 0.0.0.0:1337 --workers 3 --threads 2 --timeout 120 
     volumes:
       - ./bus/static:/bus_service/staticfiles/
-      - ./media:/bus_service/mediafiles/
+      - ./media:/bus_service/media/
     expose:
       - "1337"
     env_file:
@@ -31,7 +31,7 @@ services:
       - web 
     volumes:
       - ./bus/static:/bus_service/staticfiles/
-      - ./media:/bus_service/mediafiles/
+      - ./media:/bus_service/media/
 
 volumes:
   postgres_data:

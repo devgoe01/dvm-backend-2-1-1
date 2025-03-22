@@ -458,7 +458,7 @@ def booking_summary(request):
         'bookings': bookings,
         'confirmed_bookings': confirmed_bookings,
     }
-    print(f"\n\n\n\n{context}\n\n\n\n")
+#    print(f"\n\n\n\n{context}\n\n\n\n")
     return render(request, 'bus/booking_summary.html', context)
 
 @login_required

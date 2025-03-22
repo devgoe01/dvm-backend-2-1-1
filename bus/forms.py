@@ -21,8 +21,8 @@ class BookingForm(forms.ModelForm):
         start_stop_f_s = kwargs.pop('start_stop_from_session', None)
         end_stop_f_s = kwargs.pop('end_stop_from_session', None)
         super().__init__(*args, **kwargs)
-        print(f"\n\n\n\n{start_stop_f_s}\n\n\n\n")
-        print(f"\n\n\n\n{end_stop_f_s}\n\n\n\n")
+#        print(f"\n\n\n\n{start_stop_f_s}\n\n\n\n")
+#        print(f"\n\n\n\n{end_stop_f_s}\n\n\n\n")
         if bus and bus.route:
             self.fields['seat_class'].queryset = models.BusSeatClass.objects.filter(bus=bus)
             stop_choices = models.RouteStop.objects.filter(bus_route=bus.route).order_by('order')
