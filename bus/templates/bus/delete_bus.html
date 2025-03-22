@@ -4,7 +4,9 @@
 <h1>Delete Bus {{ bus.bus_number }}</h1>
 <hr>
 <p>Are you sure you want to delete this bus?</p>
-<p><strong>Route:</strong> {{ bus.route.source }} → {{ bus.route.destination }}</p>
+<p><strong>Route:</strong>{% for stop in bus.route.get_ordered_stops %}
+ {{ stop.stop.name }} {% if not stop.order == bus.route.stops.count %} → {% endif %}
+{% endfor %}</p>
 <!--<p><strong>Total Seats:</strong> {{ bus.total_seats }}</p>-->
 <p><strong>Departure Time:</strong> {{ bus.departure_time }}</p>
 

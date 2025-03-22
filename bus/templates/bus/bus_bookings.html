@@ -4,17 +4,25 @@
 <p><strong>Departure Time:</strong> {{ bus.departure_time }}</p>
 <p><strong>Base Fare Per Hour:</strong> {{ bus.base_fare_per_hour }}</p>
 <h2>Bookings: </h2>
-{% if bus.bookings.exists %}
-{% for booking in bus.bookings.all %}
-<p><strong>Booking ID:</strong> {{ booking.id }}</p>
-<p><strong>Passenger Name:</strong> {{ booking.user }}</p>
-<p><strong>Seats Reserved:</strong> {{ booking.seats_booked }}</p>
-<p><strong>Seat class:</strong> {{ booking.seat_class }}</p>
-<p><strong>Booking Time:</strong> {{ booking.booking_time }}</p>
-<p><strong>seat_number(s): </strong> {{ booking.seat_number }}</p>
-<p><strong>Path: </strong>{{booking.start_stop}} to {{booking.end_stop}}</p>
+{% if count == 0 %}<p>No Bookings for this bus</p>
+{% else %}<p>Number of bookings: {{ count }}</p>
+{% for bus_instance in bus.bus_instances.all %}
+    {% for booking in bus_instance.bookings.all %}
+    <p><strong>Booking ID:</strong> {{ booking.id }}</p>
+    <p><strong>Passenger Name:</strong> {{ booking.user.username }}</p>
+    <p><strong>Seats Reserved:</strong>{% for seat in booking.seats.all %}
+        {{ seat.seat_number }}{% if not forloop.last %}, {% endif %}
+    {% endfor %}</p>
+    <p><strong>Seat class:</strong> {{ booking.seats.first.get_seat_class }}</p>
+    <p><strong>Booking Time:</strong> {{ booking.booking_time }}</p>
+    <p><strong>Departure Time: </strong>{{ booking.bus.departure_time }}</p>
+    <p><strong>Booking Status:</strong> {{ booking.status }}</p>
+    <p><strong>Path: </strong>{% for stop in booking.bus.bus.route.get_ordered_stops %}
+        {% if stop.order <= booking.end_stop.order and stop.order >= booking.start_stop.order %} {{ stop.stop.name }} {% if not stop.order == booking.end_stop.order %} → {% endif %}
+        {% endif %}
+    {% endfor %}</p>
 {% endfor %}<br>
-{% else %}
-    <p>No bookings available for this bus.</p>
+{% endfor %}
 {% endif %}
+
 {% endblock content %}

@@ -1,0 +1,11 @@
+{% extends "bus/base.html" %}
+
+{% block content %}
+<h1>Routes Registered: </h1>
+{% for route in routes %}
+<p><strong>route.name:</strong>{% for stop in route.get_ordered_stops %}
+    {{ stop.stop.name }} {% if not stop.order == route.stops.count %} → {% endif %}
+   {% endfor %}</p>
+{% endfor %}
+<a href="{% url 'add_route' %}" class="btn btn-primary">Add Route</a>
+{% endblock content %}

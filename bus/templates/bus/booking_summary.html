@@ -8,7 +8,6 @@
 {% for booking in bookings %}
     <div>
         <p><strong>Booking ID:</strong> {{ booking.id }}</p>
-        <p><strong>User:</strong> {{ booking.user.username }}</p>
         <p><strong>Bus Number: </strong>{{ booking.bus.bus.bus_number }}</p>
         <p><strong>Seat class: </strong>{{ booking.seats.first.get_seat_class }}</p>
         <p><strong>Departure Time: </strong>{{ booking.bus.departure_time }}</p>
@@ -25,7 +24,7 @@
             {{ seat.seat_number }}{% if not forloop.last %}, {% endif %}
         {% endfor %}</p>
         {% else %}
-        <p style="color: red;"><strong style="color: black;">Seats Booked:</strong> {% for seat in booking.seats.all %}
+        <p style="color: red;"><strong style="color: rgb(44, 44, 44);">Seats Booked:</strong> {% for seat in booking.seats.all %}
             {{ seat.seat_number }}{% if not forloop.last %}, {% endif %}
         {% endfor %} (Cancelled)</p>
         {% endif %}
@@ -33,7 +32,15 @@
         {% if booking.can_edit %}
             <a href="{% url 'edit_booking' booking.id %}" class="btn btn-warning">Cancel Booking</a>
         {% else %}
-            <p class="text-danger">Editing not allowed (less than 6 hours left).</p>
+            <p class="text-danger">
+            {% if booking.bus.is_departed %}
+                Bus has departed. 
+            {% elif booking.status == 'Cancelled'%}
+                Booking has been cancelled.
+            {% else %}
+                Editing not allowed (less than 6 hours left).
+            {% endif %}
+            </p>
         {% endif %}
     </div>
     <hr>

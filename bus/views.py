@@ -453,11 +453,12 @@ def booking_summary(request):
         confirmed_bookings = 'no'
     for booking in bookings:
         time_remaining = (booking.bus.departure_time - timezone.now()).total_seconds() / (60 * 60)
-        booking.can_edit = time_remaining > 6
+        booking.can_edit = time_remaining > 6 and (not booking.bus.is_departed()) and booking.status == 'Confirmed'
     context = {
         'bookings': bookings,
         'confirmed_bookings': confirmed_bookings,
     }
+    print(f"\n\n\n\n{context}\n\n\n\n")
     return render(request, 'bus/booking_summary.html', context)
 
 @login_required
@@ -637,12 +638,39 @@ def edit_bus(request, bus_number):
     if request.method == "POST":
         form = EditBusForm(request.POST, instance=bus)
         if form.is_valid():
+#            if form.cleaned_data['base_fare_per_hour'] != bus.base_fare_per_hour:
+#                for bus_instance in bus.bus_instances.all():
+#                    for booking in bus_instance.bookings.all():
+#                        send_mail(
+#                            'Bus Update',
+#                            f"Bus {bus.bus_number} has been updated. Please check your dashboard for more details.",
+#                            settings.EMAIL_HOST_USER,
+#                            [booking.user.email],
+#                            fail_silently=False,
+#                        )
+#                        booking.user.wallet_balance += (Decimal(booking.booking_calculate_fare()) - Decimal(bus_instance.bus.calculate_fare(booking.start_stop,booking.end_stop,booking.seat_class.fare_multiplier,booking.seats.count())))
+#                        booking.user.save()
+            bus = form.save()
+            bus.departure_time = bus.departure_time.replace(hour=form.cleaned_data['departure_time'].hour, minute=form.cleaned_data['departure_time'].minute)
+#            print(f"\n\n\n\n{bus.departure_time}\n\n\n\n")
+#            print(f"\n\n\n\n{form.fields['departure_time']}\n\n\n\n")
             bus.save()
+            for bus_instance in bus.bus_instances.all():
+                bus_instance.departure_time = bus_instance.departure_time.replace(hour=bus.departure_time.hour, minute=bus.departure_time.minute)
+                bus_instance.save()
+                for booking in bus_instance.bookings.all():
+                    send_mail(
+                        'Bus Update',
+                        f"Bus {bus.bus_number} has been updated. Please check your dashboard for more details.",
+                        settings.EMAIL_HOST_USER,
+                        [booking.user.email],
+                        fail_silently=False,
+                    )
             messages.success(request, "Bus updated successfully!")
-            process_waitlist(bus)
+#            process_waitlist(bus)
             return redirect('dashboard')
     else:
-        form = EditBusForm(instance=bus)
+        form = EditBusForm(bus=bus)
     return render(request, 'bus/edit_bus.html', {'form': form})
 
 @login_required
@@ -723,22 +751,21 @@ def verif_del_bus_otp(request):
                 return redirect('verify_del_bus_otp')
             bus_number = temp_del['bus_number']
             bus=Bus.objects.get(bus_number=bus_number)
-            for booking in Booking.objects.filter(bus=bus):
-                if booking.status == 'Confirmed':
-                    user = booking.user
-                    user.wallet_balance += booking.seats_booked * Decimal(bus.calculate_fare(booking.seat_class.fare_multiplier,booking.start_stop,booking.end_stop))
-                    user.save()
-                    try:
-                        send_mail(
-                            f'Booking Cancelled for Bus {bus.bus_number}',
-                            f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nYour updated wallet balance is {user.wallet_balance:,.2f} rupees.\nWe apologize for any inconvenience caused.\n",
-                            settings.EMAIL_HOST_USER,[request.user.email],fail_silently=False,
-                        )
-                    except:
-                        pass
-            bus.bus_routes.delete()
-            bus.bus_seat_classes.delete()
-            bus.bus_instances.delete()
+            for busm in bus.bus_instances.all():
+                for booking in Booking.objects.filter(bus=busm):
+                    if booking.status == 'Confirmed':
+                        user = booking.user
+                        user.wallet_balance += Decimal(booking.booking_calculate_fare())
+                        user.save()
+                        try:
+                            send_mail(
+                                f'Booking Cancelled for Bus {bus.bus_number}',
+                                f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nYour updated wallet balance is {user.wallet_balance:,.2f} rupees.\nWe apologize for any inconvenience caused.\n",
+                                settings.EMAIL_HOST_USER,[request.user.email],fail_silently=False,
+                            )
+                        except:
+                            pass
+            bus.bus_instances.all().delete()
             bus.delete()
 
             Bus.objects.filter(bus_number=bus_number).delete()
@@ -768,13 +795,15 @@ def process_waitlist(bus):
         else:
             continue
 
+
 @login_required
 def bus_bookings(request, bus_number):
     if request.user.role=="passenger":
         messages.error(request, "You do not have permission to view this page.")
         return redirect('dashboard')
     bus = get_object_or_404(Bus, bus_number=bus_number)
-    return render(request, 'bus/bus_bookings.html', {'bus': bus})
+    count = sum(bus_instance.bookings.count() for bus_instance in bus.bus_instances.all())
+    return render(request, 'bus/bus_bookings.html', {'bus': bus,'count':count})
 
 @login_required
 def add_class(request):
@@ -793,7 +822,12 @@ def add_class(request):
         class_form = AddClassForm()
     return render(request, 'bus/add_class.html', {'class_form': class_form})
 
-
+def view_routes(request):
+    if not request.user.is_admin():
+        messages.error(request, "You do not have permission to access this page.")
+        return redirect('dashboard')
+    routes = BusRoute.objects.all()
+    return render(request, 'bus/view_routes.html', {'routes': routes})
 
 def initializer():
     for bus in Bus.objects.all():

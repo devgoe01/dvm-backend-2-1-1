@@ -257,6 +257,9 @@ class BusInstance(models.Model):
     def __str__(self):
         return f"Bus {self.bus.bus_number} Instance at {self.departure_time}"
     
+    def is_departed(self):
+        #print(f"\n\n\n\n{datetime.now(timezone.utc) > self.departure_time}\n\n\n\n")
+        return datetime.now(timezone.utc) > self.departure_time
 
     def get_all_available_seats(self, start_stop, end_stop,seat_class=None):
         all_seats = self.seats.values_list('id', flat=True)

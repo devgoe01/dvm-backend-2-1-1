@@ -32,6 +32,7 @@ class BookingForm(forms.ModelForm):
             self.fields['travel_date'].initial = travel_date_f_s
         if start_stop_f_s:
             self.fields['start_stop'].initial = stop_choices.get(stop_id=start_stop_f_s)
+        if end_stop_f_s:
             self.fields['end_stop'].initial = stop_choices.get(stop_id=end_stop_f_s)
 
     def clean(self):
@@ -59,7 +60,7 @@ class SearchForm(forms.Form):
     destination = forms.ModelChoiceField(queryset=models.Stop.objects.all(),required=False, label="Destination",empty_label="Select Destination")
     travel_date = forms.DateField(required=False, label="Travel Date",widget=forms.DateInput(attrs={'type': 'date'}))
 
-    sort_by_departure = forms.BooleanField(initial=True,required=False,label="Check to sort by departure time; otherwise by available seats")
+    sort_by_departure = forms.BooleanField(initial=True,required=False,label="Check to sort by departure time; otherwise by total seats")
     see_all_buses = forms.BooleanField(required=False,label="Check to see all buses")
 
     def clean(self):
@@ -111,7 +112,8 @@ class AddRouteForm(forms.ModelForm):
                 "Invalid format. Use 'stop:order' pairs separated by commas (e.g., A:1, B:2)."
             )
         
-        
+        if len(stops_list) != max(order for _, order in stops_list):
+            raise forms.ValidationError("Orders must be consecutive integers starting from 1.")
         if len(stops_list) != len(set(stop[0] for stop in stops_list)):
             raise forms.ValidationError("Duplicate stop names are not allowed.")
         if len(stops_list) != len(set(stop[1] for stop in stops_list)):
@@ -126,6 +128,8 @@ class AddRouteForm(forms.ModelForm):
             duration_list = [int(duration.strip()) for duration in durations.split(',')]
         except ValueError:
             raise forms.ValidationError("Durations must be integers representing seconds (e.g., 3600, 1800).")
+        if any(duration <= 0 for duration in duration_list):
+            raise forms.ValidationError("Duration is invalid.")
         if len(duration_list) != len(stops_list):
             raise forms.ValidationError("The number of durations must match the number of stops.")
         cleaned_data['stops_list'] = stops_list
@@ -208,14 +212,26 @@ class EditBookingForm(forms.ModelForm):
     class Meta:
         model = models.Booking
         fields = ['status']
+
 class EditBusForm(forms.ModelForm):
+    departure_time = forms.TimeField(required=True,label="Departure Time",help_text="Enter in the format HH:MM:SS",widget=forms.TimeInput(attrs={'type': 'time'}))
+    def __init__(self, *args, **kwargs):
+        bus=kwargs.pop('bus',None)
+        super().__init__(*args, **kwargs)
+        if bus:
+            self.fields['base_fare_per_hour'].initial=bus.base_fare_per_hour
+            self.fields['departure_time'].initial=bus.departure_time.time()
     class Meta:
         model = models.Bus
-        fields = ['route', 'departure_time', 'base_fare_per_hour']
+        fields = ['base_fare_per_hour']
     def clean(self):
         cleaned_data = super().clean()
+        departure_time = cleaned_data.get('departure_time')
+        aware_datetime=make_aware(datetime.combine(datetime.now().date(),departure_time))
+        cleaned_data['departure_time'] = aware_datetime
+        #print(f"\n\n\n\n{cleaned_data}\n\n\n\n")
         return cleaned_data
-    
+
 
 class AddClassForm(forms.ModelForm):
     class Meta:
