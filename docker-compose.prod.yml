@@ -2,8 +2,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.prod  # Use a production-specific Dockerfile if needed.
-    command: gunicorn bus_service.wsgi:application --bind 0.0.0.0:1337 --workers 3 --threads 2 --timeout 120 
+      dockerfile: Dockerfile.prod
     volumes:
       - ./bus/static:/bus_service/staticfiles/
       - ./media:/bus_service/media/
@@ -13,24 +12,25 @@ services:
       - ./.env.prod 
     depends_on:
       - db
+    ports:
+      - "1337:1337"
+
   db:
     image: postgres:15-alpine
-#      POSTGRES_DB: Django_Bus_WebApplication_prod
-#      POSTGRES_USER: postgres
-#      POSTGRES_PASSWORD: hphphphp
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
       - ./.env.prod.db
 
   nginx:
-    build: ./nginx 
+    build: ./nginx
     ports:
-      - "1337:80" 
+      - "8000:80" 
     depends_on:
       - web 
     volumes:
-      - ./bus/static:/bus_service/staticfiles/
+      - ./static:/bus_service/
+      - ./staticfiles:/bus_service/staticfiles/
       - ./media:/bus_service/media/
 
 volumes:

@@ -4,6 +4,7 @@
 *.log
 *.pot
 *.pyc
+\static
 bus/modelsold.py
 bus/formsold.py
 __pycache__/

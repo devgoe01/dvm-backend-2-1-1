@@ -19,10 +19,10 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY . .
 
 # Add entrypoint script and make it executable.
-COPY ./entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY ./entrypoint2.sh /entrypoint2.sh
+RUN chmod +x /entrypoint2.sh
 
 # Expose port 8000 for internal communication.
 EXPOSE 8000
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint2.sh"]

@@ -1,0 +1,41 @@
+
+# Dockerfile1 with corrected paths
+FROM nginx:latest
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    netcat-openbsd \
+    && apt-get clean
+
+# Set environment variables
+ENV PYTHONPATH=/bus_service/bus_service
+ENV DJANGO_SETTINGS_MODULE=bus_service.settings
+
+# Copy the entire project into /bus_service
+WORKDIR /bus_service
+COPY . .
+
+# Create a virtual environment and install Gunicorn inside it
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install gunicorn
+
+RUN ls -la .
+RUN ls -la ./.
+
+# Configure Nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Set permissions and make entrypoint executable
+RUN mkdir -p /var/lib/nginx /var/log/nginx && \
+    chown -R nginx:nginx /var/log/nginx /var/lib/nginx && \
+    chmod +x entrypoint.sh
+
+COPY entrypoint.sh /entrypoint.sh
+
+EXPOSE 80
+
+ENTRYPOINT ["/entrypoint.sh"]

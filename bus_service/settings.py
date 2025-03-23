@@ -162,6 +162,12 @@ USE_I18N = True
 USE_TZ = True
 
 
+# settings.py
+#SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URO = 'http://127.0.0.1:8000/accounts/google/login/callback/'
+#USE_X_FORWARDED_HOST = True
+#SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'http')
+#OAUTH_URL = 'http://127.0.0.1:8000'
+#
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 # Default primary key field type
@@ -173,7 +179,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'bus', 'static')]
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
