@@ -7,6 +7,7 @@ from .forms import AddSeatClassForm, SearchForm, BookingForm,AddRouteForm, EditB
 from django.utils.timezone import now
 from django.db.models import Sum, Prefetch
 from django.core.mail import send_mail
+from django.db import transaction
 from django.conf import settings
 from users import utils
 from django.utils import timezone
@@ -324,7 +325,6 @@ def verif_bus_otp(request):
             seat_numbers_list = temp_booking['seat_numbers_list']
             seat_numbers_list = Seat.objects.filter(id__in=seat_numbers_list)
             otp.is_verified=True
-            otp.save()
 #            travel_date=temp_booking['travel_date']
             '''print(bus_number, seats_booked, start_stop, end_stop,seat_numbers_list)'''
             if not all([bus_number, seats_booked, start_stop, end_stop,seat_numbers_list]):
@@ -332,18 +332,20 @@ def verif_bus_otp(request):
                 return redirect('dashboard')
             bus=BusInstance.objects.get(id=bus_number)
             user.wallet_balance -= (total_cost)
-            user.save()
+           
             
-
-            booking=Booking.objects.create(
-                user=user,
-                bus=bus,
-                status='Confirmed',
-                start_stop=start_stop,
-                end_stop=end_stop,
-#                travel_date=travel_date,
-            )
-            booking.seats.set(seat_numbers_list)
+            with transaction.atomic():
+                otp.save()
+                user.save()
+                booking=Booking.objects.create(
+                    user=user,
+                    bus=bus,
+                    status='Confirmed',
+                    start_stop=start_stop,
+                    end_stop=end_stop,
+#                    travel_date=travel_date,
+                )
+                booking.seats.set(seat_numbers_list)
             messages.success(request, "Your booking was successful!")
             try:
                 send_mail(
@@ -388,9 +390,10 @@ def edit_booking(request, booking_id):
 #                updated_booking.save()
 #                selected_class.save()
                 request.user.wallet_balance += Decimal(booking.booking_calculate_fare())
-                request.user.save()
                 booking.status = 'Cancelled'
-                booking.save()
+                with transaction.atomic():
+                    request.user.save()
+                    booking.save()
                 try:
                     send_mail(
                         f'Booking cancelled for bus {booking.bus.bus.bus_number} on {booking.booking_time.strftime("%A, %B %d, %Y, %I:%M %p")}',
@@ -531,17 +534,18 @@ def add_route(request):
         route_form = AddRouteForm(request.POST)
         
         if route_form.is_valid():
-            route = route_form.save()
             stops_list = route_form.cleaned_data['stops_list']
             duration_list = route_form.cleaned_data['duration_list']
-            for i, (stop_name, order) in enumerate(stops_list):
-                stop, _ = Stop.objects.get_or_create(name=stop_name)
-                RouteStop.objects.create(
-                    bus_route=route,
-                    stop=stop,
-                    order=order,
-                    duration_to_next_stop=duration_list[i]  
-                )
+            with transaction.atomic():
+                route = route_form.save()
+                for i, (stop_name, order) in enumerate(stops_list):
+                    stop, _ = Stop.objects.get_or_create(name=stop_name)
+                    RouteStop.objects.create(
+                        bus_route=route,
+                        stop=stop,
+                        order=order,
+                        duration_to_next_stop=duration_list[i]  
+                    )
             messages.success(request, "Route added successfully!")
             return redirect('add_bus')  
         else:
@@ -604,14 +608,15 @@ def add_bus(request):
         bus_form = AddBusForm(request.POST)
         seat_class_forms = [SeatClassForm(request.POST, prefix=f'seat_class_{i}') for i in range(1, 4)]
         if bus_form.is_valid() and all(form.is_valid() for form in seat_class_forms):
-            bus = bus_form.save()
-            for form in seat_class_forms:
-                seat_class = form.save(commit=False)
-                seat_class.bus = bus
-                seat_class.save()
-            bus.initialize_seats()
-            bus.initialize_bus_instances()
-            request.user.can_change_buses.add(bus)
+            with transaction.atomic():
+                bus = bus_form.save()
+                for form in seat_class_forms:
+                    seat_class = form.save(commit=False)
+                    seat_class.bus = bus
+                    seat_class.save()
+                bus.initialize_seats()
+                bus.initialize_bus_instances()
+                request.user.can_change_buses.add(bus)
             messages.success(request, "Bus added successfully!")
             return redirect('dashboard')
         else:
@@ -654,18 +659,19 @@ def edit_bus(request, bus_number):
             bus.departure_time = bus.departure_time.replace(hour=form.cleaned_data['departure_time'].hour, minute=form.cleaned_data['departure_time'].minute)
 #            print(f"\n\n\n\n{bus.departure_time}\n\n\n\n")
 #            print(f"\n\n\n\n{form.fields['departure_time']}\n\n\n\n")
-            bus.save()
-            for bus_instance in bus.bus_instances.all():
-                bus_instance.departure_time = bus_instance.departure_time.replace(hour=bus.departure_time.hour, minute=bus.departure_time.minute)
-                bus_instance.save()
-                for booking in bus_instance.bookings.all():
-                    send_mail(
-                        'Bus Update',
-                        f"Bus {bus.bus_number} has been updated. Please check your dashboard for more details.",
-                        settings.EMAIL_HOST_USER,
-                        [booking.user.email],
-                        fail_silently=False,
-                    )
+            with transaction.atomic():
+                bus.save()
+                for bus_instance in bus.bus_instances.all():
+                    bus_instance.departure_time = bus_instance.departure_time.replace(hour=bus.departure_time.hour, minute=bus.departure_time.minute)
+                    bus_instance.save()
+                    for booking in bus_instance.bookings.all():
+                        send_mail(
+                            'Bus Update',
+                            f"Bus {bus.bus_number} has been updated. Please check your dashboard for more details.",
+                            settings.EMAIL_HOST_USER,
+                            [booking.user.email],
+                            fail_silently=False,
+                        )
             messages.success(request, "Bus updated successfully!")
 #            process_waitlist(bus)
             return redirect('dashboard')
@@ -751,24 +757,25 @@ def verif_del_bus_otp(request):
                 return redirect('verify_del_bus_otp')
             bus_number = temp_del['bus_number']
             bus=Bus.objects.get(bus_number=bus_number)
-            for busm in bus.bus_instances.all():
-                for booking in Booking.objects.filter(bus=busm):
-                    if booking.status == 'Confirmed':
-                        user = booking.user
-                        user.wallet_balance += Decimal(booking.booking_calculate_fare())
-                        user.save()
-                        try:
-                            send_mail(
-                                f'Booking Cancelled for Bus {bus.bus_number}',
-                                f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nYour updated wallet balance is {user.wallet_balance:,.2f} rupees.\nWe apologize for any inconvenience caused.\n",
-                                settings.EMAIL_HOST_USER,[request.user.email],fail_silently=False,
-                            )
-                        except:
-                            pass
-            bus.bus_instances.all().delete()
-            bus.delete()
+            with transaction.atomic():
+                for busm in bus.bus_instances.all():
+                    for booking in Booking.objects.filter(bus=busm):
+                        if booking.status == 'Confirmed':
+                            user = booking.user
+                            user.wallet_balance += Decimal(booking.booking_calculate_fare())
+                            user.save()
+                            try:
+                                send_mail(
+                                    f'Booking Cancelled for Bus {bus.bus_number}',
+                                    f"Dear {user.username},\nYour booking for Bus {bus.bus_number} has been cancelled as the bus is no longer operational.\nYour updated wallet balance is {user.wallet_balance:,.2f} rupees.\nWe apologize for any inconvenience caused.\n",
+                                    settings.EMAIL_HOST_USER,[request.user.email],fail_silently=False,
+                                )
+                            except:
+                                pass
+                bus.bus_instances.all().delete()
+                bus.delete()
 
-            Bus.objects.filter(bus_number=bus_number).delete()
+                Bus.objects.filter(bus_number=bus_number).delete()
             del request.session['temp_del']
             messages.success(request, f"Bus {bus_number} deleted successfully!")
             return redirect('bus_list')
@@ -830,5 +837,6 @@ def view_routes(request):
     return render(request, 'bus/view_routes.html', {'routes': routes})
 
 def initializer():
-    for bus in Bus.objects.all():
-        bus.initialize_bus_instances()
+    with transaction.atomic():
+        for bus in Bus.objects.all():
+            bus.initialize_bus_instances()

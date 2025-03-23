@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models,transaction
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from datetime import timedelta, datetime, timezone
@@ -90,32 +90,34 @@ class Bus(models.Model):
 
     def initialize_bus_instances(self):
         today=datetime.now().date()
-        for bus in Bus.objects.all():
-            running_days=bus.days_of_week_running
-            
-            for i in range(15):
-                current_date=today+timedelta(days=i)
-                current_day_name = current_date.strftime('%A')
-                if current_day_name in running_days:
+        with transaction.atomic():
+            for bus in Bus.objects.all():
+                running_days=bus.days_of_week_running
+
+                for i in range(15):
+                    current_date=today+timedelta(days=i)
+                    current_day_name = current_date.strftime('%A')
+                    if current_day_name in running_days:
+                        departure_datetime = make_aware(datetime.combine(current_date, bus.departure_time.time()))
+                        if not BusInstance.objects.filter(bus=bus, departure_time=departure_datetime).exists():
+                            BusInstance.objects.create(bus=bus, departure_time=departure_datetime)
+
+    def last_initialize_bus_instances(self):
+        today=datetime.now().date()
+        with transaction.atomic():
+            for bus in Bus.objects.all():
+                running_days=bus.days_of_week_running
+                current_date=today+timedelta(days=15)
+                if current_date.strftime('%A') in running_days:
                     departure_datetime = make_aware(datetime.combine(current_date, bus.departure_time.time()))
                     if not BusInstance.objects.filter(bus=bus, departure_time=departure_datetime).exists():
                         BusInstance.objects.create(bus=bus, departure_time=departure_datetime)
 
-    def last_initialize_bus_instances(self):
-        today=datetime.now().date()
-        for bus in Bus.objects.all():
-            running_days=bus.days_of_week_running
-            current_date=today+timedelta(days=15)
-            if current_date.strftime('%A') in running_days:
-                departure_datetime = make_aware(datetime.combine(current_date, bus.departure_time.time()))
-                if not BusInstance.objects.filter(bus=bus, departure_time=departure_datetime).exists():
-                    BusInstance.objects.create(bus=bus, departure_time=departure_datetime)
-
     def initialize_seats(self):
-        for seat_class in BusSeatClass.objects.filter(bus=self):
-            for i in range(1,seat_class.total_seats+1):
-                Seat.objects.get_or_create(bus=self, seat_number=f"{seat_class.seat_class.name[:1]}-{i}",seat_class=seat_class)
-
+        with transaction.atomic():
+            for seat_class in BusSeatClass.objects.filter(bus=self):
+                for i in range(1,seat_class.total_seats+1):
+                    Seat.objects.get_or_create(bus=self, seat_number=f"{seat_class.seat_class.name[:1]}-{i}",seat_class=seat_class)
 
 class Seatclass(models.Model):
     name = models.CharField(max_length=50)

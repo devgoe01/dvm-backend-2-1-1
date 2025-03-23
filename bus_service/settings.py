@@ -64,15 +64,30 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_TIMEZONE = 'UTC'
 '''
 
-SOCIALACCOUNT_PROVIDERS = {
-    "google": {
-        "SCOPE": [
+'''SOCIALACCOUNT_PROVIDERS = {
+    "google":{
+        "SCOPE":[
             "profile",
-            "email",
+            "email"
         ],
-        "AUTH_PARAMS": {
-            "access_type": "online",
-        },
+        "AUTH_PARAMS" : {"access_type" : "online"},
+        'APP': {
+            'client_id': os.environ.get('GOOGLE_CLIENT_ID'),
+            'secret': os.environ.get('GOOGLE_CLIENT_SECRET'),
+            'key': '',
+            'redirect_uris': ['http://web/accounts/google/login/callback/']
+
+        }
+    }
+}
+'''
+SOCIALACCOUNT_PROVIDERS = {
+    "google":{
+        "SCOPE":[
+            "profile",
+            "email"
+        ],
+        "AUTH_PARAMS" : {"access_type" : "online"},
     }
 }
 
@@ -163,8 +178,10 @@ USE_TZ = True
 
 
 # settings.py
-#SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URO = 'http://127.0.0.1:8000/accounts/google/login/callback/'
-#USE_X_FORWARDED_HOST = True
+'''SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URI = 'http://web/accounts/google/login/callback/'
+'''#SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URL = 'http://web/accounts/google/login/callback/'
+'''SOCIAL_AUTH_GOOGLE_OAUTH2_CALLBACK_URL = 'http://web/accounts/google/login/callback/'
+'''#USE_X_FORWARDED_HOST = True
 #SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'http')
 #OAUTH_URL = 'http://127.0.0.1:8000'
 #
@@ -179,8 +196,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'staticfiles'),
+]
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
@@ -202,3 +222,4 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bus_service.settings')
+#SOCIAL_ACCOUNT_LOGIN_ON_GET = True
