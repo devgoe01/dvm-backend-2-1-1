@@ -11,7 +11,8 @@
         <p><strong>Bus Number: </strong>{{ booking.bus.bus.bus_number }}</p>
         <p><strong>Seat class: </strong>{{ booking.seats.first.get_seat_class }}</p>
         <p><strong>Departure Time: </strong>{{ booking.bus.departure_time }}</p>
-        <p><strong>Fare: </strong>{{ booking.booking_calculate_fare }}</p>
+        <p><strong>Fare: </strong>{{ booking.booking_calculate_fare }} Rupees</p>
+        <p><strong>Duration: </strong>{{ booking.get_duration }} hours</p>
         <p><strong>Route: </strong>
             {% for stop in booking.bus.bus.route.get_ordered_stops %}
                 {% if stop.order <= booking.end_stop.order and stop.order >= booking.start_stop.order %} {{ stop.stop.name }} {% if not stop.order == booking.end_stop.order %} → {% endif %}
@@ -42,6 +43,7 @@
             {% endif %}
             </p>
         {% endif %}
+        <a href="{% url 'ticket' booking.id %}" class="btn btn-primary">Download Ticket</a>
     </div>
     <hr>
 {% empty %}

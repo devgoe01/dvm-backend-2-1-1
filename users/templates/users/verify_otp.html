@@ -8,4 +8,21 @@
     </div>
     <p>If you want the OTP to be resent, enter resend in above field and click verify</a></p>
 </form>
+
+{% if booking %}
+    <p><strong>Bus Number: </strong>{{ booking.bus.bus.bus_number }}</p>
+    <p><strong>Seat class: </strong>{{ seat_class }}</p>
+    <p><strong>Departure Time: </strong>{{ booking.bus.departure_time }}</p>
+    <p><strong>Fare: </strong>{{ fare }} Rupees</p>
+    <p><strong>Duration: </strong>{{ booking.get_duration }} hours</p>
+    <p><strong>Route: </strong>
+        {% for stop in booking.bus.bus.route.get_ordered_stops %}
+            {% if stop.order <= booking.end_stop.order and stop.order >= booking.start_stop.order %} {{ stop.stop.name }} {% if not stop.order == booking.end_stop.order %} → {% endif %}
+            {% endif %}
+        {% endfor %}
+    </p>
+    <p><strong>Seats: </strong>{% for seat in seat_numbers_list %}
+        {{ seat.seat_number }}{% if not forloop.last %}, {% endif %}
+    {% endfor %}</p>
+{% endif %}
 {% endblock content %}

@@ -8,7 +8,7 @@
         <p><strong>Route:</strong>{% for stop in bus.route.get_ordered_stops %}
             {{ stop.stop.name }} {% if not stop.order == bus.route.stops.count %} → {% endif %}
            {% endfor %}</p>
-        <p><strong>Departure:</strong> {{ bus.departure_time }}</p>
+        <p><strong>Departure:</strong> {{ bus.departure_time|date:"H:i" }}</p>
         <p><strong>Seat Classes:</strong>{% for seat_class in bus.seat_classes.all %} {{ seat_class.name }} {% endfor %}</p>
 <!--    <p><strong>Total Seats:</strong> {{ seat_class.total_seats }}</p>
         <p><strong>Seats Available:</strong> {{ seat_class.seats_available }}</p>-->

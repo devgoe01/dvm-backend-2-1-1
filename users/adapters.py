@@ -17,3 +17,9 @@ class MySocialAccountAdapter(DefaultSocialAccountAdapter):
             sociallogin.connect(request, user)
         except User.DoesNotExist:
             pass
+
+#from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+#
+#class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
+#    def get_connect_redirect_url(self, request, socialaccount):
+#        return '/dashboard/'

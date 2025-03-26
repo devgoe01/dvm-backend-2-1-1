@@ -5,6 +5,9 @@ from datetime import timedelta, datetime, timezone
 from django.utils.timezone import make_aware
 #from fernet_fields import EncryptedIntegerField
 from multiselectfield import MultiSelectField
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
 
 
 class User(AbstractUser):
@@ -201,7 +204,50 @@ class Booking(models.Model):
     
     def booking_calculate_fare(self):
         return self.bus.bus.calculate_fare(self.start_stop, self.end_stop, self.seats.first().seat_class.fare_multiplier,len(self.seats.all()))
-
+    
+    def generate_ticket_pdf(self):
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        route = []
+        for stop in self.bus.bus.route.get_ordered_stops():
+            if self.start_stop.order <= stop.order <= self.end_stop.order:
+                route.append(stop.stop.name)
+        route = " → ".join(route)
+        p.drawString(100, 800, f"Booking ID: {self.id}")
+        p.drawString(100, 780, f"Username: {self.user.username}")
+        p.drawString(100, 760, f"Start Stop: {route}")
+        p.drawString(100, 740, f"Booking Date: {self.booking_time.strftime('%A, %B %d, %Y, %I:%M %p')}")
+        p.drawString(100, 720, f"Departure Time: {self.bus.departure_time.strftime('%A, %B %d, %Y, %I:%M %p')}")
+        p.drawString(100, 700, f"Seat Numbers: {', '.join([seat.seat_number for seat in self.seats.all()])}")
+        p.drawString(100, 680, f"Fare: {self.booking_calculate_fare()}")
+        p.save()
+        buffer.seek(0)
+        return buffer
+    
+    def get_duration(self):
+        total_duration = timedelta()
+        for route_stop in self.bus.bus.route.get_ordered_stops():
+            if self.start_stop.order <= route_stop.order <= self.end_stop.order:
+                total_duration += route_stop.duration_to_next_stop
+        return total_duration
+    
+    def display_ticket(self,response):
+        p = canvas.Canvas(response, pagesize=letter)
+        route = []
+        for stop in self.bus.bus.route.get_ordered_stops(): 
+            if self.start_stop.order <= stop.order <= self.end_stop.order:
+                route.append(stop.stop.name)
+        route = " → ".join(route)
+        p.drawString(100, 800, f"Booking ID: {self.id}")
+        p.drawString(100, 780, f"Username: {self.user.username}")
+        p.drawString(100, 760, f"Start Stop: {route}")
+        p.drawString(100, 740, f"Booking Date: {self.booking_time.strftime('%A, %B %d, %Y, %I:%M %p')}")
+        p.drawString(100, 720, f"Departure Time: {self.bus.departure_time.strftime('%A, %B %d, %Y, %I:%M %p')}")
+        p.drawString(100, 700, f"Seat Numbers: {', '.join([seat.seat_number for seat in self.seats.all()])}")
+        p.drawString(100, 680, f"Fare: {self.booking_calculate_fare()}")
+        p.showPage()
+        p.save()
+        return response
 
 class Waitlist(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

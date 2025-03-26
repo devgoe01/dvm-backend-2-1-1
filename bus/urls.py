@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 from django.conf import settings
 from django.conf.urls.static import static
+#from allauth.socialaccount.providers.oauth2.views import OAuth2Callback, OAuth2Login
+#from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 
 urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
@@ -27,8 +29,31 @@ urlpatterns = [
     path('stops/',views.view_stops, name='view_stops'),
     path('add-seatclass/', views.add_seat_class, name='add_seat_class'),
     path('routes/', views.view_routes, name='view_routes'),
+    path('ticket/<int:booking_id>/', views.display_ticket, name='ticket'),
+#    path('accounts/google/login/callback/', views.CustomGoogleOAuth2CallbackView.as_view(), name='google_callback'),
+#    path('accounts/google/login/callback/', OAuth2Callback.as_view(adapter=GoogleOAuth2Adapter), name='google_callback'),
+#    path('accounts/google/login/', OAuth2Login.as_view(adapter=GoogleOAuth2Adapter), name='google_login'),'''
 ]
 
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+#from django.urls import path, include
+#from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+#from allauth.socialaccount.providers.oauth2.views import OAuth2LoginView
+#from .views import CustomGoogleOAuth2CallbackView
+#
+#urlpatterns += [
+#    path(
+#        "accounts/google/login/",
+#        OAuth2LoginView.as_view(adapter=GoogleOAuth2Adapter),
+#        name="google_login",
+#    ),
+#    path(
+#        "accounts/google/login/callback/",
+#        CustomGoogleOAuth2CallbackView.as_view(),
+#        name="google_callback",
+#    ),
+#]

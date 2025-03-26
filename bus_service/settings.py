@@ -63,7 +63,6 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 # set the celery timezone
 CELERY_TIMEZONE = 'UTC'
 '''
-
 '''SOCIALACCOUNT_PROVIDERS = {
     "google":{
         "SCOPE":[
@@ -75,12 +74,21 @@ CELERY_TIMEZONE = 'UTC'
             'client_id': os.environ.get('GOOGLE_CLIENT_ID'),
             'secret': os.environ.get('GOOGLE_CLIENT_SECRET'),
             'key': '',
-            'redirect_uris': ['http://web/accounts/google/login/callback/']
-
+#           'redirect_uris': ['http://127.0.0.1:1337/accounts/google/login/callback/'],
+#            'callback_url': 'http://127.0.0.1:1337/accounts/google/login/callback/'
         }
     }
 }
+
 '''
+
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_CLIENT_ID')
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+#SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URI = 'http://127.0.0.1:1337/accounts/google/login/callback/'
+#SITE_ID = 1
+
+#SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
+
 SOCIALACCOUNT_PROVIDERS = {
     "google":{
         "SCOPE":[
@@ -90,6 +98,7 @@ SOCIALACCOUNT_PROVIDERS = {
         "AUTH_PARAMS" : {"access_type" : "online"},
     }
 }
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -120,7 +129,7 @@ TEMPLATES = [
         },
     },
 ]
-AUTHENTICATION_BACKENDS = ['allauth.account.auth_backends.AuthenticationBackend']
+AUTHENTICATION_BACKENDS = ['allauth.account.auth_backends.AuthenticationBackend','django.contrib.auth.backends.ModelBackend']
 
 
 WSGI_APPLICATION = 'bus_service.wsgi.application'
@@ -178,10 +187,11 @@ USE_TZ = True
 
 
 # settings.py
-'''SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URI = 'http://web/accounts/google/login/callback/'
+#SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URI = 'http://127.0.0.1:1337/accounts/google/login/callback/'
+
 '''#SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URL = 'http://web/accounts/google/login/callback/'
-'''SOCIAL_AUTH_GOOGLE_OAUTH2_CALLBACK_URL = 'http://web/accounts/google/login/callback/'
-'''#USE_X_FORWARDED_HOST = True
+SOCIAL_AUTH_GOOGLE_OAUTH2_CALLBACK_URL = 'http://web/accounts/google/login/callback/'''
+#USE_X_FORWARDED_HOST = True
 #SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'http')
 #OAUTH_URL = 'http://127.0.0.1:8000'
 #
@@ -197,7 +207,7 @@ MEDIA_URL = '/media/'
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'staticfiles'),
+    os.path.join(BASE_DIR, 'bus','static'),
 ]
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
@@ -222,4 +232,17 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'bus_service.settings')
-#SOCIAL_ACCOUNT_LOGIN_ON_GET = True
+'''SOCIAL_ACCOUNT_LOGIN_ON_GET = True
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://web:8000",
+    "http://web:1337",
+    "http://web",
+    "http://127.0.0.1:1337",
+    "http://localhost:1337",
+]
+INTERNAL_IPS = [
+    '127.0.0.1',
+    'localhost',
+]'''

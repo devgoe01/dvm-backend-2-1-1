@@ -6,7 +6,7 @@ from django.contrib import messages
 from .forms import AddSeatClassForm, SearchForm, BookingForm,AddRouteForm, EditBookingForm, EditBusForm, AddBusForm,SeatClassForm,AddStopForm,AddClassForm
 from django.utils.timezone import now
 from django.db.models import Sum, Prefetch
-from django.core.mail import send_mail
+from django.core.mail import send_mail,EmailMessage
 from django.db import transaction
 from django.conf import settings
 from users import utils
@@ -286,6 +286,8 @@ def verif_bus_otp(request):
     start_stop = Stop.objects.get(id=temp_booking['start_stop'])
     start_stop = RouteStop.objects.get(bus_route=bus.bus.route, stop=start_stop)
     end_stop = RouteStop.objects.get(bus_route=bus.bus.route, stop=end_stop)
+    seat_numbers_list = temp_booking['seat_numbers_list']
+    seat_numbers_list = Seat.objects.filter(id__in=seat_numbers_list)
     if request.method == "POST":
         entered_otp = request.POST.get('email_otp')
         if entered_otp.lower()=='resend':
@@ -322,8 +324,6 @@ def verif_bus_otp(request):
             start_stop = RouteStop.objects.filter(bus_route=bus.bus.route, stop__id=start_stop).first()
             end_stop = RouteStop.objects.filter(bus_route=bus.bus.route, stop__id=end_stop).first()
             total_cost=Decimal(temp_booking['total_cost'])
-            seat_numbers_list = temp_booking['seat_numbers_list']
-            seat_numbers_list = Seat.objects.filter(id__in=seat_numbers_list)
             otp.is_verified=True
 #            travel_date=temp_booking['travel_date']
             '''print(bus_number, seats_booked, start_stop, end_stop,seat_numbers_list)'''
@@ -346,21 +346,24 @@ def verif_bus_otp(request):
 #                    travel_date=travel_date,
                 )
                 booking.seats.set(seat_numbers_list)
-            messages.success(request, "Your booking was successful!")
-            try:
-                send_mail(
-                    f'Booking Confirmation for Bus {bus.bus.bus_number}',
-                    f'Your booking for {seats_booked}.\n from {start_stop} to {end_stop}.\nYour total cost is {total_cost:,.2f} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
-                    settings.EMAIL_HOST_USER,
-                    [request.user.email],
-                    fail_silently=False,
+                messages.success(request, "Your booking was successful!")
+            try :
+                email=EmailMessage(
+                    subject=f'Booking Confirmation for Bus {bus.bus.bus_number}',
+                    body=f'Your booking for {seats_booked}.\n from {start_stop} to {end_stop} is successful.\nYour total cost is {total_cost:,.2f} rupees.\nYour booking id is {booking.id}.\n Departure time for bus is {bus.departure_time.strftime("%A, %B %d, %Y, %I:%M %p")}.',
+                    from_email=settings.EMAIL_HOST_USER,
+                    to=[request.user.email]
                 )
+                email.attach(f"ticket_{booking.id}.pdf", booking.generate_ticket_pdf().getvalue(), 'application/pdf')
+                email.send(fail_silently=False)
             except: pass
+
             del request.session['temp_booking']
             return redirect('booking_summary')
         else:
             messages.error(request, "Invalid OTP. Please try again.")
-    return render(request, 'users/verify_otp.html')
+    booking=Booking(user=request.user,bus=bus,start_stop=start_stop,end_stop=end_stop)
+    return render(request, 'users/verify_otp.html', {'booking': booking,'seat_class':seat_numbers_list.first().seat_class.seat_class,'seat_numbers_list':seat_numbers_list,'fare':bus.bus.calculate_fare(start_stop,end_stop,seat_numbers_list.first().seat_class.fare_multiplier,seat_numbers_list.count())})
 
 @login_required
 def edit_booking(request, booking_id):
@@ -812,6 +815,8 @@ def bus_bookings(request, bus_number):
     count = sum(bus_instance.bookings.count() for bus_instance in bus.bus_instances.all())
     return render(request, 'bus/bus_bookings.html', {'bus': bus,'count':count})
 
+
+
 @login_required
 def add_class(request):
     if not request.user.is_admin():
@@ -840,3 +845,22 @@ def initializer():
     with transaction.atomic():
         for bus in Bus.objects.all():
             bus.initialize_bus_instances()
+
+
+def display_ticket(request,booking_id):
+    booking = get_object_or_404(Booking, id=booking_id)
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="ticket_{booking_id}.pdf"'
+    return booking.display_ticket(response)
+
+#from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+#from allauth.socialaccount.providers.oauth2.views import OAuth2CallbackView
+#from django.views.generic import View
+#from django.shortcuts import redirect
+#
+#class CustomGoogleOAuth2CallbackView(OAuth2CallbackView):
+#    def dispatch(self, request, *args, **kwargs):
+#        response = super().dispatch(request, *args, **kwargs)
+#        if request.user.is_authenticated:
+#            return redirect('/dashboard/')
+#        return response
