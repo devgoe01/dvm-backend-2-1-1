@@ -847,9 +847,12 @@ def initializer():
         for bus in Bus.objects.all():
             bus.initialize_bus_instances()
 
-
+@login_required
 def display_ticket(request,booking_id):
     booking = get_object_or_404(Booking, id=booking_id)
+    if (not request.user.can_change_buses.filter(bus_number=booking.bus.bus.bus_number).exists()) and request.user != booking.user:
+        messages.error(request, "Invalid request.")
+        return redirect('dashboard')
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'inline; filename="ticket_{booking_id}.pdf"'
     return booking.display_ticket(response)

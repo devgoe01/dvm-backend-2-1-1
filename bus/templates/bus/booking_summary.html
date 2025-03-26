@@ -43,7 +43,9 @@
             {% endif %}
             </p>
         {% endif %}
-        <a href="{% url 'ticket' booking.id %}" class="btn btn-primary">Download Ticket</a>
+        {% if booking.status == 'Confirmed' %}
+            <a href="{% url 'ticket' booking.id %}" class="btn btn-primary">Download Ticket</a>
+        {% endif %}
     </div>
     <hr>
 {% empty %}

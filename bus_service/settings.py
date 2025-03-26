@@ -129,7 +129,7 @@ TEMPLATES = [
         },
     },
 ]
-AUTHENTICATION_BACKENDS = ['allauth.account.auth_backends.AuthenticationBackend','django.contrib.auth.backends.ModelBackend']
+AUTHENTICATION_BACKENDS = ['allauth.account.auth_backends.AuthenticationBackend']
 
 
 WSGI_APPLICATION = 'bus_service.wsgi.application'
