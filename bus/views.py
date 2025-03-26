@@ -60,6 +60,7 @@ def home(request):
 
                 try :del request.session['search_data']
                 except:pass
+                request.session['search_data'] = json.dumps({ })
                 return render(request, 'bus/home.html', {'form': form, 'buses': buses,'bus_instances':bus_instances})
 
 
