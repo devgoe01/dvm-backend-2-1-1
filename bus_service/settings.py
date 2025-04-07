@@ -85,7 +85,7 @@ CELERY_TIMEZONE = 'UTC'
 SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.environ.get('GOOGLE_CLIENT_ID')
 SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 #SOCIAL_AUTH_GOOGLE_OAUTH2_REDIRECT_URI = 'http://127.0.0.1:1337/accounts/google/login/callback/'
-#SITE_ID = 1
+SITE_ID = 1
 
 #SOCIALACCOUNT_ADAPTER = 'users.adapters.CustomSocialAccountAdapter'
 
@@ -124,7 +124,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'django.template.context_processors.request',
             ],
         },
     },
@@ -221,7 +220,8 @@ LOGOUT_REDIRECT_URL = 'project-home'
 AUTH_USER_MODEL='bus.User'
 SOCIALACCOUNT_AUTO_SIGNUP = True
 ACCOUNT_UNIQUE_EMAIL = True
-SOCIALACCOUNT_ADAPTER = 'users.adapters.MySocialAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'users.adapters.MySocialAccountAdapter' 
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
