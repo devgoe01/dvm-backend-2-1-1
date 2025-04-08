@@ -1,6 +1,7 @@
 from django.db import models,transaction
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+#from django.contrib.gis.db.models import PointField
 from datetime import timedelta, datetime, timezone
 from django.utils.timezone import make_aware
 #from fernet_fields import EncryptedIntegerField
@@ -26,6 +27,9 @@ class User(AbstractUser):
 
 class Stop(models.Model):
     name = models.CharField(max_length=100, unique=True)
+#    location = PointField()
+#    latitude = models.FloatField()
+#    longitude = models.FloatField()
 
     def __str__(self):
         return self.name

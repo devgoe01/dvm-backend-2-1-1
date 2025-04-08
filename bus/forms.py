@@ -1,6 +1,7 @@
 from django import forms
 from . import models
 from datetime import datetime, timedelta
+#from leaflet.forms.widgets import LeafletWidget
 from django.utils.timezone import make_aware
 
 class BookingForm(forms.ModelForm):
@@ -169,6 +170,7 @@ class AddStopForm(forms.ModelForm):
     class Meta:
         model = models.Stop
         fields = ['name']
+
     def clean(self):
         return super().clean()
 

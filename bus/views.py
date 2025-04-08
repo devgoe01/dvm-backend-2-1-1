@@ -1,6 +1,8 @@
 import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+#from django.contrib.gis.geos import GEOSGeometry
+#from django.contrib.gis.measure import D
 from .models import User, Bus, Booking, Seatclass,Waitlist,Otps,Seat,RouteStop,Stop,BusRoute,BusInstance
 from django.contrib import messages
 from .forms import AddSeatClassForm, SearchForm, BookingForm,AddRouteForm, EditBookingForm, EditBusForm, AddBusForm,SeatClassForm,AddStopForm,AddClassForm
@@ -12,6 +14,7 @@ from django.conf import settings
 from users import utils
 from django.utils import timezone
 from datetime import timedelta
+#from geopy.distance import geodesic
 import openpyxl
 from django.http import HttpResponse
 from decimal import Decimal
@@ -569,7 +572,26 @@ def add_stop(request):
     if request.method == "POST":
         stop_form = AddStopForm(request.POST)
         if stop_form.is_valid():
-            stop_form.save()
+            new_stop = stop_form.save(commit=False)
+            '''nearby_stops = Stop.objects.filter(
+                location__distance_lte=(stop.location, D(m=100))
+            )
+            nearby_stops = []
+            for stop in Stop.objects.all():
+                distance = geodesic(
+                    (new_stop.latitude, new_stop.longitude),
+                    (stop.latitude, stop.longitude)
+                ).meters
+                if distance <= 500:  # Distance threshold in meters
+                    nearby_stops.append(stop)
+
+            if nearby_stops:
+                return render(request, 'add_stop.html', {
+                    'form': stop_form,
+                    'error': 'A stop already exists nearby.',
+                })
+            '''
+            new_stop.save()
             messages.success(request, "Stop added successfully!")
             return redirect('view_stops')
         else:

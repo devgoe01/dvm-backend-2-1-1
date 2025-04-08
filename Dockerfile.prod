@@ -1,10 +1,11 @@
-FROM python:3.11-slim-bookworm AS builder
+'''FROM python:3.11-slim-bookworm AS builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
     python3-dev \
     libpq-dev \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -20,6 +21,7 @@ FROM python:3.11-slim-bookworm
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libpq5 \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -r appuser && \
@@ -29,7 +31,6 @@ RUN useradd -m -r appuser && \
 WORKDIR /app
 
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
-
 COPY --from=builder --chown=appuser:appuser /app /app
 
 ENV PATH="/home/appuser/.local/bin:${PATH}"
@@ -44,3 +45,29 @@ EXPOSE 8000
 RUN chmod +x /app/entrypoint2.sh
 
 CMD ["/app/entrypoint2.sh"]
+'''
+
+
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+WORKDIR /bus_service
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && apt-get clean
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+EXPOSE 8000
+
+ENTRYPOINT ["./entrypoint.sh"]

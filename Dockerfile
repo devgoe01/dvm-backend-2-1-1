@@ -12,7 +12,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
-COPY ./entrypoint2.sh /entrypoint2.sh
+COPY ./entrypoint.sh /entrypoint2.sh
 RUN chmod +x /entrypoint2.sh
 
 EXPOSE 8000
